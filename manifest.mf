@@ -1,0 +1,27 @@
+CACHE MANIFEST
+
+# Explicitly cached entries
+#index.html
+#css/style.css
+
+# Explicitly cached 'master entries'.
+CACHE:
+#/favicon.ico
+#index.html
+#stylesheet.css
+#images/logo.png
+#scripts/main.js
+
+# Resources that require the user to be online.
+NETWORK:
+#login.php
+#/myapi
+#http://api.twitter.com
+
+# static.html will be served if main.py is inaccessible
+# offline.jpg will be served in place of all images in images/large/
+# offline.html will be served in place of all other .html files
+FALLBACK:
+#/main.py /static.html
+#images/large/ images/offline.jpg
+#*.html /offline.html
