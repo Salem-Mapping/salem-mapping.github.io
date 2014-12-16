@@ -1,5 +1,8 @@
 <?php
-if ( !defined("DIR_SEP"))
+
+error_reporting(E_ALL ^ E_NOTICE);
+
+if (!defined("DIR_SEP"))
 	define("DIR_SEP", DIRECTORY_SEPARATOR);
 /*******************************************************************************************************************************************************************************************************
  * CONFIG
@@ -33,17 +36,18 @@ if (isset($_HEADER['X-Requested-With']) && $_HEADER['X-Requested-With'] == "XMLH
 		switch ($_REQUEST['a']) {
 			case "load":
 				$DATA = array(
-				    'map' => array()
+				    'maps' => array ()
 				);
 				$handle = opendir($dir = ROOT . DIR_SEP . DATA_FOLDER);
-				$size = 0;
+				$size		 = 0;
+				$file_map	 = array ();
 				while (false !== ($file = readdir($handle))) {
 					if (preg_match(FILENAME_MAP, $file, $m)) {
 						$fullPath = $dir . DIR_SEP . $file;
 						$imageData = base64_encode(file_get_contents($fullPath));
 						$src = 'data: ' . mime_content_type($fullPath) . ';base64,' . $imageData;
-						$DATA['map']["{$m[2]}_{$m[4]}"] = array(
-						    'posX'  => intval($m[2]),
+						$fileMap["{$m[2]}_{$m[4]}"]	 = array (
+							'posX'  => intval($m[2]),
 						    'posY'  => intval($m[4]),
 						    'hash' => sha1($src),
 						    'file' => $file,
@@ -53,6 +57,7 @@ if (isset($_HEADER['X-Requested-With']) && $_HEADER['X-Requested-With'] == "XMLH
 						$size += filesize($dir . DIR_SEP . $file);
 					}
 				}
+				$DATA['maps'][]	 = $fileMap;
 				$DATA['maxsize'] = $size;
 				closedir($handle);
 				die(json_encode($DATA));
