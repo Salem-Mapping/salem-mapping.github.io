@@ -6,6 +6,7 @@
 var map = false;
 $(function () {
 	map = new MapViewer({
+		touch: !!('ontouchstart' in window),
 		appName: 'salem_map',
 		defaultQuota: 5 * 1024 * 1024,
 		imgPath: 'data',
@@ -30,6 +31,8 @@ $(function () {
  * @param {type} _config die Configuration
  */
 function MapViewer(_config) {
+	var _this = this;
+	var $win = $(window);
 	var config = _config;
 	var canvas = false, c2d = false;
 	var fileSystem = false;
@@ -47,7 +50,7 @@ function MapViewer(_config) {
 	};
 	var appName = config.appName;
 	canvas = $("#map");
-	var slider = $(".slider").slider({
+	var slider = config.touch ? false : $(".slider").slider({
 		orientation: "vertical",
 		min: -10,
 		max: 15
@@ -87,9 +90,12 @@ function MapViewer(_config) {
 	var currentlyGrantedBytes = 0;
 	var initFileSystem = function (askQuota, optionalCallback) {
 		if (navigator.persistentStorage && askQuota > currentlyGrantedBytes) {
-			console.log("requestQuota: " + askQuota);
-			navigator.persistentStorage.queryUsageAndQuota(function (grantedBytes) {
+			console.log("requestQuota: ", askQuota);
+			navigator.persistentStorage.queryUsageAndQuota(function (remainigBytes, grantedBytes) {
+				var usedBytes = grantedBytes - remainigBytes;
 				console.log("currently granted Bytes:", grantedBytes);
+				console.log("currently used Bytes:", usedBytes);
+				console.log("currently remainig Bytes:", remainigBytes);
 				var initFileSystemCore = function (bytes) {
 					window.requestFileSystem(PERSISTENT, bytes, function (fs) {
 						console.log("requestFileSystem: success", fs);
@@ -108,9 +114,9 @@ function MapViewer(_config) {
 						}, fsError);
 					}, fsError);
 				};
-				if (grantedBytes < askQuota) {
-					console.log("request Bytes:", askQuota);
-					navigator.persistentStorage.requestQuota(askQuota, function (grantedBytes) {
+				if (remainigBytes < askQuota) {
+					console.log("request Bytes:", usedBytes + askQuota);
+					navigator.persistentStorage.requestQuota(usedBytes + askQuota, function (grantedBytes) {
 						console.log("now granted Bytes:", grantedBytes);
 						initFileSystemCore(grantedBytes);
 					}, fsError);
@@ -154,7 +160,8 @@ function MapViewer(_config) {
 			cX = parseInt(r[1]);
 			cY = parseInt(r[2]);
 			scale = parseInt(r[3]);
-			slider.slider("value", scale);
+			if (slider)
+				slider.slider("value", scale);
 			cScale = Math.pow(1 - config.scaleStep, scale);
 			calcPos(false);
 		}
@@ -174,7 +181,7 @@ function MapViewer(_config) {
 		}
 	};
 
-	$(window).resize(resizeWindow);
+	$win.resize(resizeWindow);
 	resizeWindow();
 
 	/***************************************************************************************************************************************************************************************************
@@ -330,89 +337,147 @@ function MapViewer(_config) {
 	/***************************************************************************************************************************************************************************************************
 	 * INTERACT
 	 **************************************************************************************************************************************************************************************************/
-	var allowMouseMove = false;
-	var isAnimated = false;
-	var tX = 0, tY = 0, mX = 0, mY = 0, md = false;
+	var allowPointerMove = false;
+	var allowPointerZoom = false;
+	var pointerCount = 2;
+	var inAnimation = false;
+	var pointers = new Pointers();
+
+
 	var animateMove = function () {
-		isAnimated = true;
-		if (mX - tX != 0 || mX - tX != 0) {
-			cX = cX + Math.round((mX - tX) / cScale);
-			cY = cY + Math.round((mY - tY) / cScale);
-			tX = mX;
-			tY = mY;
+		inAnimation = true;
+		var p = pointers[0];
+		if (p.diffX() !== 0 || p.diffY() !== 0) {
+			cX = cX + Math.round(p.diffX() / cScale);
+			cY = cY + Math.round(p.diffY() / cScale);
+			p.clearDiff();
 			calcPos(false);
 			build();
 		}
-		if (allowMouseMove) {
+		if (allowPointerMove) {
 			requestAnimationFrame(animateMove);
 		} else {
-			isAnimated = false;
+			inAnimation = false;
 		}
-	}
+	};
 
-	canvas.mousemove(function (e) {
-		mX = e.clientX;
-		mY = e.clientY;
-		if (allowMouseMove && !isAnimated) {
+	// MOVE
+	canvas.bind("mousemove", function (e) {
+		pointers.importMouse(e.originalEvent);
+		if (allowPointerMove && !inAnimation) {
 			requestAnimationFrame(animateMove);
 		}
+		return false;
 	});
-
-	canvas.mousedown(function (e) {
-		md = [(new Date).getMicrotime(), mX, mY];
-		switch (e.button) {
-			default:
-				break;
-			case 0:
-				tX = mX;
-				tY = mY;
-				if (e.shiftKey) {
-
-				} else {
-					allowMouseMove = true;
+	canvas.bind("touchmove", function (e) {
+		pointers.importTouches(e.originalEvent.touches);
+		switch (pointers.length) {
+			case 1:
+				if (allowPointerMove && !inAnimation) {
+					requestAnimationFrame(animateMove);
 				}
+				return false;
+
+			case 2:
+				allowPointerZoom = true;
+				break;
+
+			default:
 		}
 	});
-	$(window).mouseup(function (e) {
-		var isClick = ((mX - md[1]) == 0 && (mY - md[2]) == 0 && ((new Date).getMicrotime() - md[0]) <= 250);
+
+	// START
+	canvas.bind("mousedown", function (e) {
+		pointers.importMouse(e);
 		switch (e.button) {
 			default:
 				break;
 			case 0:
-				if (isClick) {
-					markPos(Math.round(((mX - winW / 2) / cScale - cX - size / 2) / size), Math.round(((mY - winH / 2) / cScale - cY - size / 2) / size));
-				} else if (allowMouseMove) {
-					cX = cX + Math.round((mX - tX) / cScale);
-					cY = cY + Math.round((mY - tY) / cScale);
-					calcPos(true);
-				} else {
+				allowPointerMove = true;
+		}
+		return false;
+	});
+	canvas.bind("touchstart", function (e) {
+		var evt = e.originalEvent;
+		var touches = evt.touches;
+		pointers.importTouches(touches);
+		switch (pointerCount = touches.length) {
+			case 1:
+				allowPointerMove = true;
+				return false;
 
-				}
-				allowMouseMove = false;
-				(tX = mX) && (tY = mY);
+			case 2:
+				allowPointerZoom = true;
 				break;
+
+			default:
+		}
+	});
+
+	// END
+	var endEvent = function (e) {
+		if (p.isClick()) {
+			markPos(Math.round(((p.mX - winW / 2) / cScale - cX - size / 2) / size), Math.round(((p.mY - winH / 2) / cScale - cY - size / 2) / size));
+		} else if (allowPointerMove) {
+			cX = cX + Math.round((p.diffX()) / cScale);
+			cY = cY + Math.round((p.diffY()) / cScale);
+			calcPos(true);
+		} else {
+
+		}
+		allowPointerMove = false;
+//				p.clearDiff();
+		return false;
+	}
+	;
+	$win.bind("touchend", function (e) {
+		var evt = e.originalEvent;
+//		var touches = evt.touches;
+		switch (pointerCount) {
+			case 1:
+				return endEvent(e);
+
+			case 2:
+				return false;
+
+			default:
+		}
+	});
+	$win.bind("mouseup", function (e) {
+		pointers.importMouse(e);
+		switch (e.button) {
+			default:
+				break;
+			case 0:
+				return endEvent(e);
+
 			case 1:
 				scale = 0;
-				slider.slider("value", scale);
+				if (slider)
+					slider.slider("value", scale);
 				cScale = Math.pow(1 - config.scaleStep, scale);
 				calcPos(true) && build();
+				return false;
 		}
+		return true;
 	});
+
+
 	var kd = [];
 	var keyPress = true;
 	var kX = 0, kY = 0, factor = config.keyMovementFactor;
-	$(window).keydown(
+	$win.keydown(
 			function (e) {
-				keyPress = (typeof (kd[e.keyCode]) == "undefined");
+				keyPress = (kd[e.keyCode] === undefined);
 				kd[e.keyCode] = (new Date).getMicrotime();
-				cY = cY + (kY = e.keyCode == 38 ? 1 : e.keyCode == 40 ? -1 : 0) * (e.shiftKey ? 1 : factor);
-				cX = cX + (kX = e.keyCode == 37 ? 1 : e.keyCode == 39 ? -1 : 0) * (e.shiftKey ? 1 : factor);
-				if (!allowMouseMove && kX + kY != 0) {
+				cY = cY + (kY = e.keyCode === 38 ? 1 : e.keyCode === 40 ? -1 : 0) * (e.shiftKey ? 1 : factor);
+				cX = cX + (kX = e.keyCode === 37 ? 1 : e.keyCode === 39 ? -1 : 0) * (e.shiftKey ? 1 : factor);
+				if (!allowPointerMove && kX + kY != 0) {
 					calcPos(true);
 					build();
 				}
 			});
-	$(window).keyup(function (e) {
+	$win.keyup(function (e) {
 		var delta = 0;
 		switch (e.keyCode) {
 			case 38: // OBEN
@@ -470,7 +535,8 @@ function MapViewer(_config) {
 
 		if (delta != 0) {
 			scale += delta;
-			slider.slider("value", scale);
+			if (slider)
+				slider.slider("value", scale);
 			cScale = Math.pow(1 - config.scaleStep, scale);
 		}
 		calcPos(true);
@@ -481,20 +547,25 @@ function MapViewer(_config) {
 		var e = window.event || e;
 		var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
 		scale -= delta;
-		slider.slider("value", scale);
+		if (slider)
+			slider.slider("value", scale);
 		cScale = Math.pow(1 - config.scaleStep, scale);
 		calcPos(true);
 		build();
 	});
-	slider.on("slidechange", function (e, ui) {
-		scale = ui.value;
-		cScale = Math.pow(1 - config.scaleStep, scale);
-		calcPos(true);
-		build();
-	});
+
+	if (slider) {
+		slider.on("slidechange", function (e, ui) {
+			scale = ui.value;
+			cScale = Math.pow(1 - config.scaleStep, scale);
+			calcPos(true);
+			build();
+		});
+	}
+
 	canvas.on("contextmenu", function (e) {
-		if (e.shiftKey)
-			return true;
+//		if (e.shiftKey)
+		return true;
 		var menu = [{
 				name: 'create',
 				//img: 'images/create.png',
@@ -520,14 +591,14 @@ function MapViewer(_config) {
 		$(e.target).contextMenu(menu);
 		return false;
 	});
-	// action
+// action
 	if (storage.getItem(appName + '_currentPositionX') != null && storage.getItem(appName + '_currentPositionY') != null) {
 		sX = storage.getItem(appName + '_currentPositionX');
 		sY = storage.getItem(appName + '_currentPositionY');
 	}
 
 	reload();
-	// worker.postMessage({});
+// worker.postMessage({});
 
 	/***************************************************************************************************************************************************************************************************
 	 * UPLOAD
@@ -569,7 +640,6 @@ function MapViewer(_config) {
 
 		if (!files)
 			return false;
-		var uploads = [];
 		var fileCount = 0;
 		for (var i = 0; i < files.length; i++) {
 			var file = files[i];
@@ -589,8 +659,10 @@ function MapViewer(_config) {
 						console.log("result", reader.result.byteLength, reader.result);
 						var data = new Uint8Array(reader.result);
 						console.log("data", data);
-						crypto.subtle.digest({name: "SHA", length: 256}, data).then(function (hash) {
+						crypto.subtle.digest({name: "SHA-256"}, data).then(function (hash) {
 							console.log("hash", hash);
+						}).catch(function (x, y, z) {
+							console.log("error", x, y, z);
 						});
 					};
 				}(file));
