@@ -36,14 +36,14 @@ window.Pointers = (function () {
 			} else {
 				Array.prototype.push.call(this, value);
 			}
-			return(this);
+			return this;
 
 		},
 		addAll: function () {
 			for (var i = 0; i < arguments.length; i++) {
 				this.add(arguments[ i ]);
 			}
-			return(this);
+			return this;
 		},
 		importMouse: function (click) {
 			var idx = 0;
@@ -59,6 +59,12 @@ window.Pointers = (function () {
 					this[idx] = new Pointer(touches[idx]);
 				else
 					this[idx].import(touches[idx]);
+			}
+			return this;
+		},
+		clearDiff: function () {
+			for (var idx = 0; idx < this.length; idx++) {
+				this[idx].clearDiff();
 			}
 			return this;
 		}

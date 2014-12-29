@@ -9,9 +9,10 @@ if (!defined("DIR_SEP"))
  * **************************************************************************************************************************************************************************************************** */
 
 define("ROOT", dirname(__DIR__));
-const DATA_FOLDER = 'web/data';
-const FILENAME_MAP = ' /^(tile_)(\-?[0-9]+)([_])(\-?[0-9]+)(\..*)$/i';
-const FILENAME_FORMAT = 'tile_%s_%s';
+		const MAPS_STORAGE_FILE = ROOT . DIRECTORY_SEPARATOR . "maps.json";
+		const DATA_FOLDER = 'web/data';
+		const FILENAME_MAP = ' /^(tile_)(\-?[0-9]+)([_])(\-?[0-9]+)(\..*)$/i';
+		const FILENAME_FORMAT = 'tile_%s_%s';
 
 //define("DROPBOX_APP_KEY", 'cog274db738jxvc');
 //define("DROPBOX_APP_SECRET", '3h5qoe3j68xc32t');
@@ -35,12 +36,48 @@ if (isset($_HEADER['X-Requested-With']) && $_HEADER['X-Requested-With'] == "XMLH
 
 		switch ($_REQUEST['a']) {
 			case "load":
+
+				$lastJSON	 = is_file(MAPS_STORAGE_FILE) ? file_get_contents(MAPS_STORAGE_FILE) : "null";
+				$lastDATA	 = json_decode($lastJSON, true);
+
+				/*
+				 * CHECK
+				 */
+
+				$changed = false;
+				$fileMap = $lastDATA['maps'][0];
+				$handle	 = opendir($dir	 = ROOT . DIR_SEP . DATA_FOLDER);
+				while (false !== ($file	 = readdir($handle))) {
+					if (preg_match(FILENAME_MAP, $file, $m)) {
+						$fullPath = $dir . DIR_SEP . $file;
+						if (!isset($fileMap["{$m[2]}_{$m[4]}"]) || filemtime($fullPath) > $fileMap["{$m[2]}_{$m[4]}"]['date']) {
+							$changed = true;
+							break;
+						}
+					}
+				}
+
+				/*
+				 * NEW
+				 */
+
+				if (!$changed) {
+					$client_last_modified	 = !empty($_SERVER['HTTP_IF_MODIFIED_SINCE']) ? strtotime(trim($_SERVER['HTTP_IF_MODIFIED_SINCE'])) : null;
+					$file_last_modified		 = filemtime(MAPS_STORAGE_FILE);
+//					header("File-Last-Modified:" . date("r", $file_last_modified));
+//					header("Client-Last-Modified:" . date("r", $client_last_modified));
+					if ($client_last_modified >= $file_last_modified) {
+						header($_SERVER['SERVER_PROTOCOL'] . ' 304 Not Modified');
+						exit(304);
+					}
+				}
+
 				$DATA		 = array (
 					'maps' => array ()
 				);
-				$handle		 = opendir($dir		 = ROOT . DIR_SEP . DATA_FOLDER);
 				$size		 = 0;
 				$file_map	 = array ();
+				$handle		 = opendir($dir		 = ROOT . DIR_SEP . DATA_FOLDER);
 				while (false !== ($file		 = readdir($handle))) {
 					if (preg_match(FILENAME_MAP, $file, $m)) {
 						$fullPath					 = $dir . DIR_SEP . $file;
@@ -60,7 +97,10 @@ if (isset($_HEADER['X-Requested-With']) && $_HEADER['X-Requested-With'] == "XMLH
 				$DATA['maps'][]	 = $fileMap;
 				$DATA['maxsize'] = $size + 1 * 1024 * 1024;
 				closedir($handle);
-				die(json_encode($DATA));
+				$JSON			 = json_encode($DATA);
+				file_put_contents(MAPS_STORAGE_FILE, $JSON);
+
+				die($JSON);
 				break;
 
 			case "upload":

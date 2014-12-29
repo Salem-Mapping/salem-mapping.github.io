@@ -6,8 +6,6 @@
 	
 	<!-- Bolder -->
 	<marker match="gfx/terobjs/bumling/bumling-granite" text="Granite Boulder" color="#CA6700" />
-   <marker match="gfx/terobjs/bumling/bumling" text="Stone Boulder" color="#333333" />
-   <marker match="gfx/terobjs/bumling/bumling2" text="Stone Boulder" color="#333333" />
 	<marker match="gfx/terobjs/woodpile" text="Wood Pile" color="#754719" />
 	<marker match="gfx/terobjs/woodheap" text="Wood Heap" color="#754719" />
 </group>
