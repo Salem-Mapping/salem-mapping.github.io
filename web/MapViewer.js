@@ -8,10 +8,10 @@
  */
 function MapViewer(_config, _init) {
 	var __MapViewer = this;
-	var $win = typeof (window) === undefined ? $(window) : false;
+	var $win = typeof (window) === "undefined" ? false : $(window);
 	var config = __MapViewer.config = _config;
 	var init = __MapViewer.init = $win === false ? false : _init === undefined ? true : _init;
-	var canvas = false, c2d = false;
+	var canvas = config.canvas, c2d = false;
 	var fileSystem = false;
 	var mapFolder = false;
 	var winW = 0, winH = 0, cX = 0, cY = 0, sX = 0, sY = 0;
@@ -26,16 +26,17 @@ function MapViewer(_config, _init) {
 		cY: 0
 	};
 	var appName = config.appName;
-	canvas = $("#map");
-	var slider = config.touch ? false : $(".slider").slider({
-		orientation: "vertical",
-		min: -10,
-		max: 15
-	});
-	var center = $(".centerBarInner");
-	c2d = canvas[0].getContext('2d');
+	if ($win) {
+		var slider = config.touch ? false : $(".slider").slider({
+			orientation: "vertical",
+			min: -10,
+			max: 15
+		});
+		var center = $(".centerBarInner");
+		c2d = canvas[0].getContext('2d');
+		var storage = window.localStorage;
+	}
 	var size = config.size;
-	var storage = window.localStorage;
 	// init local file System
 
 	var fsError = function (e) {
@@ -386,7 +387,7 @@ function MapViewer(_config, _init) {
 		});
 		// START
 		canvas.bind("mousedown", function (e) {
-			pointers.importMouse(e).clearDiff();
+			pointers.importMouse(e, true).clearDiff();
 			switch (e.button) {
 				default:
 					break;
@@ -410,7 +411,7 @@ function MapViewer(_config, _init) {
 			}
 		});
 		// END
-		var endEvent = function (e) {
+		var endMove = function (e) {
 			var p = pointers[0];
 			if (p.isClick()) {
 				markPos(Math.round(((p.mX - winW / 2) / cScale - cX - size / 2) / size), Math.round(((p.mY - winH / 2) / cScale - cY - size / 2) / size));
@@ -427,11 +428,10 @@ function MapViewer(_config, _init) {
 		}
 		;
 		$win.bind("touchend", function (e) {
-			var evt = e.originalEvent;
-//		var touches = evt.touches;
+			pointers.importTouches(e.originalEvent.touches);
 			switch (pointerCount) {
 				case 1:
-					return endEvent(e);
+					return endMove(e);
 				case 2:
 					return false;
 				default:
@@ -443,7 +443,7 @@ function MapViewer(_config, _init) {
 				default:
 					break;
 				case 0:
-					return endEvent(e);
+					return endMove(e);
 				case 1:
 					scale = 0;
 					if (slider)
@@ -592,17 +592,17 @@ function MapViewer(_config, _init) {
 	if (init) {
 		reload();
 
-		var worker = new Worker('worker.js');
-		worker.onmessage = function (e) {
-//			console.log("e", e);
-			var urls = e.data.entries;
-			urls.forEach(function (url, i) {
-				window.resolveLocalFileSystemURL(url, function (fileEntry) {
-//					console.log(fileEntry.name); // Print out file's name.
-				});
-			});
-		};
-		worker.postMessage({'cmd': 'list'});
+//		var worker = new Worker('worker.js');
+//		worker.onmessage = function (e) {
+////			console.log("e", e);
+//			var urls = e.data.entries;
+//			urls.forEach(function (url, i) {
+//				window.resolveLocalFileSystemURL(url, function (fileEntry) {
+////					console.log(fileEntry.name); // Print out file's name.
+//				});
+//			});
+//		};
+//		worker.postMessage({'cmd': 'list'});
 	}
 
 	/***************************************************************************************************************************************************************************************************
@@ -620,48 +620,50 @@ function MapViewer(_config, _init) {
 		e.stopPropagation();
 		e.preventDefault();
 	}
-	canvas.bind("dragenter", noopHandler);
-	canvas.bind("dragover", function (e) {
-		noopHandler(e);
-		canvas.addClass("dropover");
-	});
-	canvas.bind("dragleave", function (e) {
-		noopHandler(e);
-		canvas.removeClass("dropover");
-	});
-	canvas.bind("drop", function (e) {
-		noopHandler(e);
-		// canvas.css({
-		// cursor : 'wait'
-		// });
-		canvas.removeClass("dropover");
-		switch (true) {
-			case (!!e.originalEvent && !!e.originalEvent.dataTransfer && !!e.originalEvent.dataTransfer.files):
-				files = e.originalEvent.dataTransfer.files;
-				break;
-			case (!!e.target.files):
-				files = e.target.files;
-				break;
-			case (!!e.dataTransfer && !!e.dataTransfer.files):
-				files = e.dataTransfer.files;
-				break;
-			default:
-				var files = false;
-		}
 
-		if (!files)
-			return false;
-		var fileCount = 0;
-		for (var i = 0; i < files.length; i++) {
-			var file = files[i];
-			var r = config.regNameMap.exec(file['name']);
-			if (!r)
-				continue;
-			// UPLOAD
-			(function (i, file, r, sX, sY) {
-				/*
-				 * get DataURL
-				 */
+	if ($win) {
+		canvas.bind("dragenter", noopHandler);
+		canvas.bind("dragover", function (e) {
+			noopHandler(e);
+			canvas.addClass("dropover");
+		});
+		canvas.bind("dragleave", function (e) {
+			noopHandler(e);
+			canvas.removeClass("dropover");
+		});
+		canvas.bind("drop", function (e) {
+			noopHandler(e);
+			// canvas.css({
+			// cursor : 'wait'
+			// });
+			canvas.removeClass("dropover");
+			switch (true) {
+				case (!!e.originalEvent && !!e.originalEvent.dataTransfer && !!e.originalEvent.dataTransfer.files):
+					files = e.originalEvent.dataTransfer.files;
+					break;
+				case (!!e.target.files):
+					files = e.target.files;
+					break;
+				case (!!e.dataTransfer && !!e.dataTransfer.files):
+					files = e.dataTransfer.files;
+					break;
+				default:
+					var files = false;
+			}
+
+			if (!files)
+				return false;
+			var fileCount = 0;
+			for (var i = 0; i < files.length; i++) {
+				var file = files[i];
+				var r = config.regNameMap.exec(file['name']);
+				if (!r)
+					continue;
+				// UPLOAD
+				(function (i, file, r, sX, sY) {
+					/*
+					 * get DataURL
+					 */
 //				var reader = new FileReader();
 //				reader.readAsArrayBuffer(file);
 //				(function (currentFile) {
@@ -678,40 +680,40 @@ function MapViewer(_config, _init) {
 //					};
 //				}(file));
 
-				/*
-				 * Upload
-				 */
+					/*
+					 * Upload
+					 */
 
-				// *
-				if (files.length > 9) {
-					var formData = new FormData();
-					formData.append('a', 'upload');
-					formData.append('x', sX + parseInt(r[1]));
-					formData.append('y', sY + parseInt(r[2]));
-					formData.append(i, file);
-					$.ajax({
-						url: location.href,
-						type: 'POST',
-						data: formData,
-						cache: false,
-						contentType: false,
-						processData: false,
-						dataType: "json",
-						async: true,
-						success: function (data) { //
-							if (++fileCount >= files.length) {
-								canvas.css({
-									cursor: ''
-								});
-								reload();
+					// *
+					if (files.length > 9) {
+						var formData = new FormData();
+						formData.append('a', 'upload');
+						formData.append('x', sX + parseInt(r[1]));
+						formData.append('y', sY + parseInt(r[2]));
+						formData.append(i, file);
+						$.ajax({
+							url: location.href,
+							type: 'POST',
+							data: formData,
+							cache: false,
+							contentType: false,
+							processData: false,
+							dataType: "json",
+							async: true,
+							success: function (data) { //
+								if (++fileCount >= files.length) {
+									canvas.css({
+										cursor: ''
+									});
+									reload();
+								}
 							}
-						}
-					});
-				}
-				// */
+						});
+					}
+					// */
 
-			})(i, file, r, sX, sY);
-		}
-
-	});
+				})(i, file, r, sX, sY);
+			}
+		});
+	}
 }

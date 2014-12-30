@@ -6,6 +6,7 @@
 var map = false;
 $(function () {
 	map = new MapViewer({
+		canvas: $("#map"),
 		touch: !!('ontouchstart' in window),
 		appName: 'salem_map',
 		defaultQuota: 5 * 1024 * 1024,

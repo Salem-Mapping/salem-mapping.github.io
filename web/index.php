@@ -11,7 +11,7 @@ if (!defined("DIR_SEP"))
 define("ROOT", dirname(__DIR__));
 		const MAPS_STORAGE_FILE = ROOT . DIRECTORY_SEPARATOR . "maps.json";
 		const DATA_FOLDER = 'web/data';
-		const FILENAME_MAP = ' /^(tile_)(\-?[0-9]+)([_])(\-?[0-9]+)(\..*)$/i';
+		const FILENAME_MAP = ' /^(tile_)(\-?[0-9]+)([_])(\-?[0-9]+)(\.(.*))$/i';
 		const FILENAME_FORMAT = 'tile_%s_%s';
 
 //define("DROPBOX_APP_KEY", 'cog274db738jxvc');
@@ -37,68 +37,97 @@ if (isset($_HEADER['X-Requested-With']) && $_HEADER['X-Requested-With'] == "XMLH
 		switch ($_REQUEST['a']) {
 			case "load":
 
-				$lastJSON	 = is_file(MAPS_STORAGE_FILE) ? file_get_contents(MAPS_STORAGE_FILE) : "null";
-				$lastDATA	 = json_decode($lastJSON, true);
+				$JSON	 = is_file(MAPS_STORAGE_FILE) ? file_get_contents(MAPS_STORAGE_FILE) : "null";
+				$DATA	 = json_decode($JSON, true);
 
 				/*
 				 * CHECK
 				 */
 
-				$changed = false;
-				$fileMap = $lastDATA['maps'][0];
-				$handle	 = opendir($dir	 = ROOT . DIR_SEP . DATA_FOLDER);
-				while (false !== ($file	 = readdir($handle))) {
-					if (preg_match(FILENAME_MAP, $file, $m)) {
-						$fullPath = $dir . DIR_SEP . $file;
-						if (!isset($fileMap["{$m[2]}_{$m[4]}"]) || filemtime($fullPath) > $fileMap["{$m[2]}_{$m[4]}"]['date']) {
-							$changed = true;
-							break;
+//				$changed = false;
+//				$fileMap = $lastDATA['maps'][0];
+//				$handle	 = opendir($dir	 = ROOT . DIR_SEP . DATA_FOLDER);
+//				while (false !== ($file	 = readdir($handle))) {
+//					if (preg_match(FILENAME_MAP, $file, $m)) {
+//						$fullPath = $dir . DIR_SEP . $file;
+//						if (!isset($fileMap["{$m[2]}_{$m[4]}"]) || filemtime($fullPath) > $fileMap["{$m[2]}_{$m[4]}"]['date']) {
+//							$changed = true;
+//							break;
+//						}
+//					}
+//				}
+
+				$dir = ROOT . DIR_SEP . DATA_FOLDER;
+				foreach ($DATA['maps'][0] as $coord => &$row) {
+					if (preg_match(FILENAME_MAP, $file = $row['file'], $m)) {
+						$imagick_type	 = new Imagick();
+						$file_handle	 = fopen($dir . DIR_SEP . $file, 'a+');
+						$imagick_type->readImageFile($file_handle);
+						$signature		 = $imagick_type->getImageSignature();
+
+						$tmp	 = explode("/", $mime	 = trim(image_type_to_mime_type(exif_imagetype($file))));
+						if ($tmp[0] == "application" && $tmp[1] == "octet-stream") {
+							$mine	 = ($tmp[0]	 = "image") . "/" . ($tmp[1]	 = $m[count($m) - 1]);
+						}
+						if ($tmp[0] == "image") {
+							$newFile = sprintf("%s.%s", $signature, $tmp[1]);
+							if (rename($dir . DIR_SEP . $file, $dir . DIR_SEP . $newFile)) {
+								header("$file-rename: {$newFile}");
+								$row['file'] = $newFile;
+								$row['hash'] = $signature;
+							} else {
+								header("$file-cant-rename: {$newFile}");
+							}
+						} else {
+							header("$file-mime: " . json_encode($mime));
 						}
 					}
 				}
+
+				$JSON = json_encode($DATA);
+				file_put_contents(MAPS_STORAGE_FILE, $JSON);
 
 				/*
 				 * NEW
 				 */
 
-				if (!$changed) {
-					$client_last_modified	 = !empty($_SERVER['HTTP_IF_MODIFIED_SINCE']) ? strtotime(trim($_SERVER['HTTP_IF_MODIFIED_SINCE'])) : null;
-					$file_last_modified		 = filemtime(MAPS_STORAGE_FILE);
+//				if (!$changed) {
+				$client_last_modified	 = !empty($_SERVER['HTTP_IF_MODIFIED_SINCE']) ? strtotime(trim($_SERVER['HTTP_IF_MODIFIED_SINCE'])) : null;
+				$file_last_modified		 = filemtime(MAPS_STORAGE_FILE);
 //					header("File-Last-Modified:" . date("r", $file_last_modified));
 //					header("Client-Last-Modified:" . date("r", $client_last_modified));
-					if ($client_last_modified >= $file_last_modified) {
-						header($_SERVER['SERVER_PROTOCOL'] . ' 304 Not Modified');
-						exit(304);
-					}
+				if ($client_last_modified >= $file_last_modified) {
+//					header($_SERVER['SERVER_PROTOCOL'] . ' 304 Not Modified');
+//					exit(304);
 				}
-
-				$DATA		 = array (
-					'maps' => array ()
-				);
-				$size		 = 0;
-				$file_map	 = array ();
-				$handle		 = opendir($dir		 = ROOT . DIR_SEP . DATA_FOLDER);
-				while (false !== ($file		 = readdir($handle))) {
-					if (preg_match(FILENAME_MAP, $file, $m)) {
-						$fullPath					 = $dir . DIR_SEP . $file;
-						$imageData					 = base64_encode(file_get_contents($fullPath));
-						$src						 = 'data: ' . mime_content_type($fullPath) . ';base64,' . $imageData;
-						$fileMap["{$m[2]}_{$m[4]}"]	 = array (
-							'posX'	 => intval($m[2]),
-							'posY'	 => intval($m[4]),
-							'hash'	 => sha1($src),
-							'file'	 => $file,
-							'size'	 => filesize($dir . DIR_SEP . $file),
-							'date'	 => filemtime($dir . DIR_SEP . $file)
-						);
-						$size += filesize($dir . DIR_SEP . $file);
-					}
-				}
-				$DATA['maps'][]	 = $fileMap;
-				$DATA['maxsize'] = $size + 1 * 1024 * 1024;
-				closedir($handle);
-				$JSON			 = json_encode($DATA);
-				file_put_contents(MAPS_STORAGE_FILE, $JSON);
+				//				}
+//				$DATA		 = array (
+//					'maps' => array ()
+//				);
+//				$size		 = 0;
+//				$file_map	 = array ();
+//				$handle		 = opendir($dir		 = ROOT . DIR_SEP . DATA_FOLDER);
+//				while (false !== ($file		 = readdir($handle))) {
+//					if (preg_match(FILENAME_MAP, $file, $m)) {
+//						$fullPath					 = $dir . DIR_SEP . $file;
+//						$imageData					 = base64_encode(file_get_contents($fullPath));
+//						$src						 = 'data: ' . mime_content_type($fullPath) . ';base64,' . $imageData;
+//						$fileMap["{$m[2]}_{$m[4]}"]	 = array (
+//							'posX'	 => intval($m[2]),
+//							'posY'	 => intval($m[4]),
+//							'hash'	 => sha1($src),
+//							'file'	 => $file,
+//							'size'	 => filesize($dir . DIR_SEP . $file),
+//							'date'	 => filemtime($dir . DIR_SEP . $file)
+//						);
+//						$size += filesize($dir . DIR_SEP . $file);
+//					}
+//				}
+//				$DATA['maps'][]	 = $fileMap;
+//				$DATA['maxsize'] = $size + 1 * 1024 * 1024;
+//				closedir($handle);
+//				$JSON			 = json_encode($DATA);
+//				file_put_contents(MAPS_STORAGE_FILE, $JSON);
 
 				die($JSON);
 				break;

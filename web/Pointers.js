@@ -45,12 +45,12 @@ window.Pointers = (function () {
 			}
 			return this;
 		},
-		importMouse: function (click) {
+		importMouse: function (_click) {
 			var idx = 0;
-			if (this[idx] === undefined)
-				this[idx] = new Pointer(click);
+			if (_click.type === "mousedown" || this[idx] === undefined)
+				this[idx] = new Pointer(_click);
 			else
-				this[idx].import(click);
+				this[idx].import(_click);
 			return this;
 		},
 		importTouches: function (touches) {
