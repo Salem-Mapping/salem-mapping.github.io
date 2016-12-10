@@ -23,12 +23,13 @@ if (isset($_HEADER['X-Requested-With']) && $_HEADER['X-Requested-With'] == "XMLH
 	header('Content-type: application/json');
 	if (isset($_REQUEST['a'])) {
 
+        include ROOT . '/lib/php-curl-class/src/Curl/CaseInsensitiveArray.php';
+        include ROOT . '/lib/php-curl-class/src/Curl/MultiCurl.php';
 		include ROOT . '/lib/php-curl-class/src/Curl/Curl.php';
 		$curl = new Curl\Curl();
 
 		switch ($_REQUEST['a']) {
 			case "load":
-
 				$JSON	 = is_file(MAPS_STORAGE_FILE) ? file_get_contents(MAPS_STORAGE_FILE) : "{}";
 				$DATA	 = json_decode($JSON, true);
 
