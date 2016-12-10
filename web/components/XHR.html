@@ -1,0 +1,74 @@
+
+//<script type="text/javascript">
+    'use strict';
+	this.XHR = (function () {
+
+		function XHR(_url, _options) {
+			var opt = this.options = _options === undefined ? {} : _options;
+			if (opt.header === undefined)
+				opt.header = {};
+			if (opt.header['X-Requested-With'] === undefined)
+				opt.header['X-Requested-With'] = "XMLHttpRequest";
+			
+			this.url = _url === undefined ? "" : _url;
+			this.xhr = new XMLHttpRequest();
+		}
+
+		XHR.getJSON = function (_url, _options) {
+			return new XHR(_url, _options).getJSON();
+		};
+
+		XHR.get = function (_url, _options) {
+			return  new XHR(_url, _options).get();
+		};
+
+		XHR.post = function (_url, _data, _options) {
+			return  new XHR(_url, _options).post(_data);
+		};
+
+		XHR.prototype = {
+			getJSON: function () {
+				var self = this;
+				this.options.responseType = "json";
+				return self.get();
+			},
+			get: function () {
+				return this.request("GET");
+			},
+			post: function (_data) {
+				return this.request("POST", _data);
+			},
+			request: function (_method, _data) {
+				var self = this;
+				var mehtod = _method !== undefined ? _method : 'GET';
+				return new Promise(function (_resolve, _reject) {
+					self.xhr.onload = function () {
+						_resolve(this.response, this.statusText, self);
+					};
+					self.xhr.onerror = function () {
+						_reject(self, self.xhr.textStatus, self.xhr.status);
+					};
+					for (var attr in self.options) {
+						switch (attr) {
+							case "header":
+								break;
+							default:
+								self.xhr[attr] = self.options[attr];
+						}
+					}
+					self.xhr.open(mehtod, self.url, true);
+					for (var head in typeof (self.options['header']) === "object" ? self.options['header'] : {}) {
+						self.xhr.setRequestHeader(head, self.options['header'][head]);
+					}
+
+					if (_data !== undefined) {
+						self.xhr.send(_data);
+					} else {
+						self.xhr.send();
+					}
+				});
+			}
+		};
+		return(XHR);
+	}).call(this);
+//</script>

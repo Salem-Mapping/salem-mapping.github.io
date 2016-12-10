@@ -1,0 +1,238 @@
+
+//<link rel="import" href="ExtendedAPI.html">
+//<script type="text/javascript">
+'use strict';
+//	if (typeof (importScripts) !== "undefined") {
+//		importScripts("ExtendedAPI.html");
+//	}
+
+var context = this;
+class WorkerController {
+	constructor (_url, _shared) {
+		var self = this;
+		self.worker = false;
+		self.ports = [];
+		self.functions = {};
+		self.msgPointers = {};
+		switch (true) {
+			case (typeof (Window) !== "undefined" && context instanceof Window):
+			var shared = _shared === undefined ? false : _shared;
+			var worker = self.worker = (shared && !!context.SharedWorker) ? new SharedWorker(_url) : (!!context.Worker) ? new Worker(_url) : false;
+			if (worker === false)
+			return false;
+			self.addPort(worker.port !== undefined ? worker.port : worker);
+			worker.addEventListener("error", function (e) {
+				self.onIncomeError(self, e);
+			});
+			break;
+
+			case (typeof (WorkerGlobalScope) !== "undefined" && context instanceof WorkerGlobalScope):
+			case (typeof (DedicatedWorkerGlobalScope) !== "undefined" && context instanceof DedicatedWorkerGlobalScope):
+			self.addPort(context);
+			break;
+
+			case (typeof (SharedWorkerGlobalScope) !== "undefined" && context instanceof SharedWorkerGlobalScope):
+
+			context.addEventListener("connect", function (e) {
+				self.addPort(e.ports);
+			});
+			break;
+
+			default:
+			return false;
+		}
+		return self;
+	}
+	addPort (_ports) {
+		var self = this;
+		var ports = Array.isArray(_ports) ? _ports : [_ports];
+		var pIds = [];
+		ports.forEach(function (port, idx) {
+			var pId = self.ports.indexOf(port);
+			if (pId === -1) {
+				pId = self.ports.push(port);
+				port.onmessage = function (e) {
+					self.onIncomeMessage(self, e);
+				};
+				port.onerror = function (e) {
+					self.onIncomeError(self, e);
+				};
+
+				if (!!port.start)
+				port.start();
+			}
+			pIds[idx] = pId;
+		});
+		return (ports.length === 1) ? pIds.shift() : pIds;
+	}
+	post (_command, _data, _port) {
+		var self = this;
+		var port = _port === undefined ? false : _port;
+		return new Promise(function (_resolve, _reject) {
+			var data = JSON.parse(JSON.stringify(_data));
+			var message = new WorkerMessage(_command, data);
+			self.msgPointers[message.id] = {resolve: _resolve, reject: _reject};
+			switch (true) {
+				case typeof (port) === "object" && typeof (port.postMessage) === "function":
+				port.postMessage(message);
+				break;
+
+				case self.ports.length === 0 && self.worker !== false:
+				self.worker.postMessage(message);
+				break;
+
+				case self.ports.length === 0:
+				return _reject("no port available");
+				break;
+
+				case port === true:
+				self.ports.getRandom().postMessage(message);
+				break;
+
+				case port === false:
+				self.ports.forEach(function (port) {
+					port.postMessage(message);
+				});
+				break;
+
+				case self.ports[port] !== undefined:
+				self.ports[port].postMessage(message);
+				break;
+
+				default:
+				return _reject("unknown port " + JSON.stringify(port));
+			}
+		});
+	}
+	onIncomeMessage (self, e) {
+		var message = new WorkerMessage(e);
+		if (self.msgPointers[message.id] !== undefined) {
+			var msgPointer = self.msgPointers[message.id];
+			if (message.command)
+			msgPointer.resolve(message.data);
+			else
+			msgPointer.reject.apply(this, message.data);
+		}
+		if (typeof (message.command) === "string") {
+			var commands = [];
+			commands = commands.concat(self.functions["*"] !== undefined ? self.functions["*"] : []);
+			commands = commands.concat(self.functions[message.command] !== undefined ? self.functions[message.command] : []);
+
+			var promiseToDo = [];
+			commands.forEach(function (func) {
+				if (func instanceof Function) {
+					promiseToDo.push(new Promise(function (_resolve, _reject) {
+						var result = func(message.data, message);
+						if (result instanceof Promise) {
+							result.then(_resolve, _reject);
+						} else {
+							_resolve(result);
+						}
+					}));
+				}
+			});
+
+			Promise.all(promiseToDo).then(function (_results) {
+				var results = Array.isArray(_results) ? _results : [_results];
+				for (var i = 0; i < results.length; i++) {
+					if (results[i] === undefined) {
+						results.splice(i--, 1);
+					}
+				}
+				var result = results.length === 0 ? true : results.length === 1 ? results.shift() : results;
+				message.reply(result);
+			}, function () {
+				var args = Array.prototype.slice.call(arguments);
+				message.reply(args, false);
+			});
+		}
+	}
+	onIncomeError (self, e) {
+		console.log('Error received from worker', e, self);
+	}
+	registerCommand (_specificCommand, _function) {
+		var self = this;
+		var cmd = typeof (_specificCommand) === "string" ? _specificCommand : "*";
+		var func = _specificCommand instanceof Function && !(_function instanceof Function) ? _specificCommand : _function;
+
+		if (!func instanceof Function)
+		return false;
+
+		if (self.functions[cmd] === undefined) {
+			self.functions[cmd] = [];
+		}
+
+		self.functions[cmd].push(func);
+		return self;
+	}
+}
+
+class WorkerMessage {
+	constructor (_event, _data) {
+		var self = this;
+		var id = false, command = false, obj = false, data = false, event = false, port = false;
+		if (_event instanceof MessageEvent) {
+			event = _event;
+			obj = event.data !== undefined ? event.data : {};
+			id = obj.id !== undefined ? obj.id : false;
+			command = obj.command !== undefined ? obj.command : false;
+			data = obj.data !== undefined ? obj.data : {};
+			port = event.target !== undefined ? event.target : false;
+		} else {
+			id = self.generateUUId(8);
+			command = _event;
+			data = _data;
+		}
+
+		Object.defineProperties(self, {
+			id: {
+				enumerable: true,
+				value: id
+			},
+			command: {
+				enumerable: true,
+				value: command
+			},
+			data: {
+				enumerable: true,
+				value: data
+			},
+			event: {
+				enumerable: true,
+				value: event
+			},
+			port: {
+				enumerable: true,
+				value: port
+			}
+		});
+		return this;
+	}
+	generateUUId (_anz) {
+		var anz = _anz === undefined || !isNaN(_anz) ? 4 : _anz;
+		return Math.floor((1 + Math.random()) * Math.pow(0x10, anz)).toString(16).substring(1);
+	}
+	reply (_data, _success) {
+		var self = this;
+		var success = _success === undefined ? true : _success;
+			if (self.port === false)  {
+			return false;
+		}
+		try {
+			var	data = JSON.stringify(JSON.parse(_data));
+		} catch (e) {
+			var	data = _data;
+		}
+
+		var reply = {id: self.id, command: success, data: data};
+		try {
+			self.port.postMessage(reply);
+		} catch (e) {
+			console.log("reply failed", reply, e);
+		}
+	}
+}
+
+
+
+//</script>

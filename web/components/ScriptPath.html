@@ -1,0 +1,120 @@
+
+//<script>
+    'use strict';
+	function ScriptPath() {
+		var doc = document;
+		this.pathParts = null;
+		try {
+			throw new Error();
+		}
+		catch (e) {
+			var stackLines = e.stack.split('\n');
+			var callerIndex = 0;
+			for (var i in stackLines) {
+				if (!stackLines[i].match(/http[s]?:\/\//))
+					continue;
+				callerIndex = Number(i) + 1;
+				break;
+			}
+			this.pathParts = stackLines[callerIndex].match(/((http[s]?):\/\/((?:([^@]+)@)?([^/@:]+)(?::(\d+))?)((\/.*?)?(?:\/(([^/:]+)(?:\.([^/:.]+)))))):/i);
+		}
+
+		Object.defineProperties(this, {
+			url: {
+				enumerable: true,
+				get: function () {
+					return this.pathParts === null ? false : this.pathParts[1];
+				}
+			},
+			protocol: {
+				enumerable: true,
+				get: function () {
+					return this.pathParts === null ? false : this.pathParts[2];
+				}
+			},
+			authority: {
+				enumerable: true,
+				get: function () {
+					return this.pathParts === null ? false : this.pathParts[3];
+				}
+			},
+			userinfo: {
+				enumerable: true,
+				get: function () {
+					return this.pathParts === null ? false : this.pathParts[4];
+				}
+			},
+			host: {
+				enumerable: true,
+				get: function () {
+					return this.pathParts === null ? false : this.pathParts[5];
+				}
+			},
+			port: {
+				enumerable: true,
+				get: function () {
+					return this.pathParts === null ? false : this.pathParts[6];
+				}
+			},
+			fullPath: {
+				enumerable: true,
+				get: function () {
+					return this.pathParts === null ? false : this.pathParts[7];
+				}
+			},
+			path: {
+				enumerable: true,
+				configurable: false,
+				get: function () {
+					return this.pathParts === null ? false : this.pathParts[8];
+				}
+			},
+			file: {
+				enumerable: true,
+				get: function () {
+					return this.pathParts === null ? false : this.pathParts[9];
+				}
+			},
+			basename: {
+				enumerable: true,
+				get: function () {
+					return this.pathParts === null ? false : this.pathParts[10];
+				}
+			},
+			extension: {
+				enumerable: true,
+				get: function () {
+					return this.pathParts === null ? false : this.pathParts[11];
+				}
+			}
+		});
+
+		var importFound = false;
+		var links = doc.querySelectorAll('link[rel=import]');
+		for (var i = 0; i < links.length; ++i) {
+			var imp = links[i].import;
+			if (imp !== undefined && imp !== null) {
+				if (imp.URL === this.url) {
+					importFound = imp;
+					break;
+				}
+			}
+		}
+
+		Object.defineProperties(this, {
+			isImported: {
+				writeable: false,
+				enumerable: true,
+				value: importFound !== false
+			},
+			document: {
+				writeable: false,
+				enumerable: true,
+				value: importFound !== false ? importFound : doc
+			}
+		});
+
+		Object.seal(this);
+		return this;
+	}
+//</script>

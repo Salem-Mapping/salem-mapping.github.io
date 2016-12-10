@@ -1,0 +1,12 @@
+{
+  "uploadOnSave": true,
+  "hostname": "pryos.org",
+  "target": "/var/www/smap",
+  "ignore": [
+    ".git/**",
+    "nbproject/**"
+  ],
+  "username": "root",
+  "password": "EinsZwei82#",
+  "transport": "scp"
+}

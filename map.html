@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>MapViewer</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+		<meta name="HandheldFriendly" content="true" />
+
+		<style>
+			html,
+			body {
+				height: 100%;
+				width: 100%;
+				overflow: hidden;
+				margin: 0;
+				padding: 0;
+			}
+		</style>
+
+		<script>
+			if (!('import' in document.createElement('link'))) {
+				var node = document.createElement("script");  
+				node.src="lib/webcomponents-lite.js";
+				document.head.appendChild(node);
+			}
+		</script>
+
+		<link rel="import" href="components/MapViewer.html">
+	</head>
+
+	<body>
+	<PY-MapViewer>
+		Dein Browser kann leider noch keine HTML Imports. 
+		Demnächst wird ein Fallback dafür implementiert.
+		<!--Osten City Kind Karing Kristians-->
+		<!--Westen Eisen-->
+		<!--Süd-Osten Stillwater-->
+	</PY-MapViewer>
+</body>
+
+</html>

@@ -1,0 +1,214 @@
+/* <style>
+	/*	ALL */
+	.OneClickEdit {cursor: pointer;}
+	.OneClickEdit:hover {text-decoration: underline;}
+
+	/*	INPUT	*/
+	.OneClickEdit-input {border: 0;}
+
+	/*	SELECT	*/
+	.OneClickEdit-select {position: relative;}
+	.OneClickEdit-group {display: block; position: absolute;top: 90%;left: 0; color: #FFF; border-radius: 4px;padding:2px 5px;background: black;background: rgba(0, 0, 0, 0.7);
+							filter: progid:DXImageTransform.Microsoft.Gradient(GradientType=0, StartColorStr='#B2000000', EndColorStr='#B2000000');}
+	.OneClickEdit-group span {display: block; cursor: pointer; padding:0 5px; margin: 0 -5px; }
+	.OneClickEdit-element:hover, .OneClickEdit-text:hover{background: rgba(255, 255, 255, 0.2);
+																filter: progid:DXImageTransform.Microsoft.Gradient(GradientType=0, StartColorStr='#6EFFFFFF', EndColorStr='#6EFFFFFF');}
+	.OneClickEdit-subgroup {display: block;background: rgba(255, 255, 255, 0.15);}
+	/* choose different colors for every layer */
+	.deep-1{filter: progid:DXImageTransform.Microsoft.Gradient(GradientType=0, StartColorStr='#50FFFFFF', EndColorStr='#50FFFFFF');}
+	.deep-2 {filter: progid:DXImageTransform.Microsoft.Gradient(GradientType=0, StartColorStr='#30FFFFFF', EndColorStr='#30FFFFFF');}
+</style> */
+//<script type="text/javascript">
+// default config
+	this.OneClickEdit = (function () {
+		var default_config = {
+			options: false,
+			success: false,
+			max: 0,
+			space: 10,
+			'class': 'OneClickEdit'
+		};
+		var cls = function (_selector, _i, _context) {
+			// process input
+			var context = _context !== undefined ? _context :  document;
+			var self = this;
+			self.me = null;
+			var c = {};
+
+			switch (typeof (_selector)) {
+				case "object":
+					self.me = _selector;
+					break;
+
+				default:
+					self.me = context.querySelector(_selector);
+			}
+
+			if (self.me === null) {
+				throw Error("Kein Objekt gefunden!");
+			}
+
+			c.merge(default_config);
+
+			switch (true) {
+				default:
+					break;
+				case (Array.isArray(_i)):	// options array
+					c.options = _i;
+					break;
+				case (typeof (_i) === "function"): 	// success function
+					c.success = _i;
+					break;
+
+				case (typeof (_i) === "object"):	// config array
+					c.merge(_i);
+			}
+
+			// function
+			self.me.classList.add(c['class']);
+			if (!c.options) {
+				// Text
+				self.me.addEventListener("click", function (_e) {
+					var val = self.me.text();
+					var obj = document.createElement("input");
+					obj.classList.add(c['class'] + '-input');
+					obj.value = val;
+					obj.style.setProperty({
+						width: self.me.style.width,
+						fontSize: self.me.style.fontSize,
+						fontFamily: self.me.style.fontFamily,
+						fontWeight: self.me.style.fontWeight,
+						letterSpacing: self.me.style.letterSpacing
+					});
+
+					obj.setAttributes({
+						maxlength: (c.max > 0) ? c.max : null
+					});
+					obj.addEventListener("keypress keyup", function (e) {
+						self.me.textContent = this.value;
+						self.me.innerHTML = self.me.innerHTML.replace(/ /g, "&nbsp;");
+						obj.style.width = self.me.style.width + c.space;
+					});
+					obj.addEventListener("blur", function () {
+						val = null;
+						if (c.success && typeof (c.success) === "function") {
+							if (c.success(obj.value) !== false) {
+								val = obj.value;
+							}
+						} else {
+							val = obj.value;
+						}
+						if (val !== null) {
+							self.me.textContent = val;
+							obj.style.display = "";
+							obj.remove();
+							obj = false;
+						}
+					});
+
+					// insert only at the end!
+					self.me.style.display = "none";
+					self.me.insertAfterThis(obj);
+					obj.focus();
+
+					_e.cancelBubble = true;
+					_e.preventDefault();
+					return false;
+				});
+			} else {
+				// Select
+				self.me.addEventListener("click", function (_e) {
+					var opt = (typeof (c.options) === "function") ? c.options() : c.options;
+					var close = function (e) {
+						if (typeof (e) === 'undefined' || !self.obj.contains(e.target)) {
+							self.me.style.display = "";
+							self.obj.remove();
+							context.removeEventListener("click", close);
+						}
+					};
+					var dsp = self.me.cloneNode(true);
+					dsp.classList.remove(c['class']);
+					dsp.classList.add(c['class'] + '-display');
+
+					var fnc = function (_o, _d) {
+						_d = (isFinite(String(_d))) ? _d : 0;
+						if (typeof (_o) !== "object") {
+							return false;
+						}
+						var grp = document.createElement("span");
+						grp.classList.add(c['class'] + '-' + ((_d == 0) ? 'group' : 'subgroup deep-' + _d));
+						grp.style.display = "none";
+						var elms = [];
+
+						_o.forEach(function (val, key) {
+							var elm, sub, elmWrapper;
+							switch (typeof (val)) {
+								default:
+									elm = document.createElement("span");
+									elm.classList.add(c['class'] + '-element')
+									elm.setAttribute('ref', key);
+									elm.textContent = val;
+									elm.addEventListener('click', function (e) {
+										var ret = true;
+										if (c.success && typeof (c.success) === "function") {
+											ret = (c.success(val, key));
+										}
+										if (ret !== false) {
+											dsp.textContent = val;
+											self.me.textContent = val;
+										}
+										close();
+									})
+									elms.push(elm);
+									grp.appendChild(elm);
+									break;
+								case 'object':
+									elmWrapper = document.createElement("span");
+									elmWrapper.classList.add(c['class'] + '-wrapper')
+
+									elm = document.createElement("span")
+
+									elm.classList.add(c['class'] + '-text')
+									elm.textContent = key;
+									elm.addEventListener('click', function (e) {
+										if (sub.style.display === 'none') {
+											sub.style.display = '';
+										} else {
+											sub.style.display = '';
+											[].prototype.forEach.call(elm.querySelectorAll('.' + c['class'] + '-wrapper, .' + c['class'] + '-element'), function () {
+												this.style.display = "";
+											});
+											[].prototype.forEach.call(elm.querySelectorAll('.' + c['class'] + '-subgroup'), function () {
+												this.style.display = "none";
+											});
+										}
+									})
+									elmWrapper.appendChild(elm);
+									elmWrapper.appendChild(sub = fnc(val, _d + 1));
+									grp.appendChild(elm);
+									elms.push(elm);
+							}
+						});
+						return grp;
+					};
+					var sel = fnc(opt)
+					self.obj = document.createElement("span");
+					self.obj.classList.add(c['class'] + '-select');
+					self.obj.appendChild(dsp);
+					self.obj.appendChild(sel);
+					self.me.style.display = "none";
+					self.me.insertAfterThis(self.obj);
+					context.addEventListener("click", close);
+					sel.style.display = "";
+
+					_e.cancelBubble = true;
+					_e.preventDefault();
+					return false;
+				});
+			}
+
+		};
+
+		return(cls);
+	}).call(this);
+</script>

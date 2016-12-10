@@ -11,23 +11,15 @@ if (!defined("DIR_SEP"))
 define("ROOT", dirname(__DIR__));
 		const MAPS_STORAGE_FILE = ROOT . DIRECTORY_SEPARATOR . "maps.json";
 		const DATA_FOLDER = 'web/data';
-		const FILENAME_MAP = ' /^(tile_)(\-?[0-9]+)([_])(\-?[0-9]+)(\.(.*))$/i';
+		const FILENAME_MAP = ' /^(tile_)(\-?[\d]+)([_])(\-?[\d]+)(\.(.*))$/i';
 		const FILENAME_FORMAT = 'tile_%s_%s';
-
-//define("DROPBOX_APP_KEY", 'cog274db738jxvc');
-//define("DROPBOX_APP_SECRET", '3h5qoe3j68xc32t');
-//define("DROPBOX_AUTHORIZATION_CODE", 'XnWIUg-OIrEAAAAAAAAABV6pcNik0-FItTODagLwOcA');
-// {"access_token": "XnWIUg-OIrEAAAAAAAAAB7XLPgp-XuxNuvDZd7SP2MNvLx2Rk1cFSNovSpRU3CPi", "token_type": "bearer", "uid": "221550161"}
-//define("DROPBOX_ACCESS_TOKEN", 'XnWIUg-OIrEAAAAAAAAAB7XLPgp-XuxNuvDZd7SP2MNvLx2Rk1cFSNovSpRU3CPi');
-
-
 
 /* * *****************************************************************************************************************************************************************************************************
  * SCRIPT
  * **************************************************************************************************************************************************************************************************** */
 
 $_HEADER = getallheaders();
-if (isset($_HEADER['X-Requested-With']) && $_HEADER['X-Requested-With'] == "XMLHttpRequest" || isset($_GET['a'])) {
+if (isset($_HEADER['X-Requested-With']) && $_HEADER['X-Requested-With'] == "XMLHttpRequest" || isset($_REQUEST['a'])) {
 	header('Content-type: application/json');
 	if (isset($_REQUEST['a'])) {
 
@@ -37,7 +29,7 @@ if (isset($_HEADER['X-Requested-With']) && $_HEADER['X-Requested-With'] == "XMLH
 		switch ($_REQUEST['a']) {
 			case "load":
 
-				$JSON	 = is_file(MAPS_STORAGE_FILE) ? file_get_contents(MAPS_STORAGE_FILE) : "null";
+				$JSON	 = is_file(MAPS_STORAGE_FILE) ? file_get_contents(MAPS_STORAGE_FILE) : "{}";
 				$DATA	 = json_decode($JSON, true);
 
 				/*
@@ -56,36 +48,47 @@ if (isset($_HEADER['X-Requested-With']) && $_HEADER['X-Requested-With'] == "XMLH
 //						}
 //					}
 //				}
-
-				$dir = ROOT . DIR_SEP . DATA_FOLDER;
-				foreach ($DATA['maps'][0] as $coord => &$row) {
-					if (preg_match(FILENAME_MAP, $file = $row['file'], $m)) {
-						$imagick_type	 = new Imagick();
-						$file_handle	 = fopen($dir . DIR_SEP . $file, 'a+');
-						$imagick_type->readImageFile($file_handle);
-						$signature		 = $imagick_type->getImageSignature();
-
-						$tmp	 = explode("/", $mime	 = trim(image_type_to_mime_type(exif_imagetype($file))));
-						if ($tmp[0] == "application" && $tmp[1] == "octet-stream") {
-							$mine	 = ($tmp[0]	 = "image") . "/" . ($tmp[1]	 = $m[count($m) - 1]);
-						}
-						if ($tmp[0] == "image") {
-							$newFile = sprintf("%s.%s", $signature, $tmp[1]);
-							if (rename($dir . DIR_SEP . $file, $dir . DIR_SEP . $newFile)) {
-								header("$file-rename: {$newFile}");
-								$row['file'] = $newFile;
-								$row['hash'] = $signature;
-							} else {
-								header("$file-cant-rename: {$newFile}");
-							}
-						} else {
-							header("$file-mime: " . json_encode($mime));
-						}
-					}
+//				$dir = ROOT . DIR_SEP . DATA_FOLDER;
+				foreach ($DATA['maps'] as $idx => &$map) {
+					unset($map['hash']);
+//					foreach ($map['tiles'] as $coord => &$row) {
+//						if (is_file($dir . DIR_SEP . ($file = $row['file']))) {
+//						if (preg_match(FILENAME_MAP, $file, $fileMatch)) {
+//							$mime	 = explode("/", $mimeStr = trim(image_type_to_mime_type(exif_imagetype($file))));
+//							if ($mime[0] == "application" && $mime[1] == "octet-stream") {
+//								$mine	 = ($mime[0] = "image") . "/" . ($mime[1] = $fileMatch[count($fileMatch) - 1]);
+//							}
+//
+//							$imagick_type	 = new Imagick();
+//							$file_handle	 = fopen($dir . DIR_SEP . $file, 'a+');
+//							if ($imagick_type->readImageFile($file_handle)) {
+//								$signature	 = $imagick_type->getImageSignature();
+//
+//							if ($mime[0] == "image") {
+//								$newFile = sprintf("%s.%s", $signature, $mime[1]);
+//								if (rename($dir . DIR_SEP . $file, $dir . DIR_SEP . $newFile)) {
+//									header("$file-rename: {$newFile}");
+//									$row['file'] = $newFile;
+//								$row['hash'] = $signature;
+//								} else {
+//									header("$file-cant-rename: {$newFile}");
+//								}
+//							} else {
+//								header("$file-mime: " . json_encode($mimeStr));
+//							}
+//						} 
+//					}
+//							}
+//						}
+//					}
+					$map['hash'] = sha1(json_encode($map));
 				}
-
-				$JSON = json_encode($DATA);
-				file_put_contents(MAPS_STORAGE_FILE, $JSON);
+//
+//				$DATA['maps'][1] = $DATA['maps'][0];
+//
+				$DATA['ts']	 = filemtime(MAPS_STORAGE_FILE);
+				$JSON		 = json_encode($DATA);
+//				file_put_contents(MAPS_STORAGE_FILE, $JSON);
 
 				/*
 				 * NEW
@@ -93,13 +96,13 @@ if (isset($_HEADER['X-Requested-With']) && $_HEADER['X-Requested-With'] == "XMLH
 
 //				if (!$changed) {
 				$client_last_modified	 = !empty($_SERVER['HTTP_IF_MODIFIED_SINCE']) ? strtotime(trim($_SERVER['HTTP_IF_MODIFIED_SINCE'])) : null;
-				$file_last_modified		 = filemtime(MAPS_STORAGE_FILE);
-//					header("File-Last-Modified:" . date("r", $file_last_modified));
-//					header("Client-Last-Modified:" . date("r", $client_last_modified));
+				$file_last_modified		 = $DATA['ts'];
+				header("mod: " . date("r", $client_last_modified) . " => " . date("r", $file_last_modified));
 				if ($client_last_modified >= $file_last_modified) {
-//					header($_SERVER['SERVER_PROTOCOL'] . ' 304 Not Modified');
-//					exit(304);
+					header($_SERVER['SERVER_PROTOCOL'] . ' 304 Not Modified');
+					exit(304);
 				}
+				die($JSON);
 				//				}
 //				$DATA		 = array (
 //					'maps' => array ()
@@ -126,23 +129,58 @@ if (isset($_HEADER['X-Requested-With']) && $_HEADER['X-Requested-With'] == "XMLH
 //				$DATA['maps'][]	 = $fileMap;
 //				$DATA['maxsize'] = $size + 1 * 1024 * 1024;
 //				closedir($handle);
-//				$JSON			 = json_encode($DATA);
+//				$JSON = json_encode($DATA);
 //				file_put_contents(MAPS_STORAGE_FILE, $JSON);
-
-				die($JSON);
+//
+//				die($JSON);
 				break;
 
 			case "upload":
-				if (count($_FILES) > 0) {
-					$filepath = ROOT . DIR_SEP . DATA_FOLDER . DIR_SEP;
-					foreach ($_FILES AS $key => $_FILE) {
-						if (preg_match(FILENAME_MAP, $_FILE['name'], $m)) {
-							$filename	 = $m[1] . $_REQUEST['x'] . $m[3] . $_REQUEST['y'] . $m[5];
-							$ret		 = (move_uploaded_file($_FILE['tmp_name'], $filepath . $filename));
-						}
+				session_start();
+				$response	 = false;
+				$mapId		 = isset($_POST['mapId']) ? $_POST['mapId'] : null;
+				$posX		 = isset($_POST['x']) ? intval($_POST['x']) : null;
+				$posY		 = isset($_POST['x']) ? intval($_POST['y']) : null;
+				$coords		 = sprintf("%s_%s", $posX, $posY);
+				if (count($_FILES) > 0 && $mapId !== null && $posX !== null && $posY !== null) {
+					$JSON	 = is_file(MAPS_STORAGE_FILE) ? file_get_contents(MAPS_STORAGE_FILE) : "{}";
+					$DATA	 = json_decode($JSON, true);
+
+					$imagick	 = new Imagick();
+					$path		 = ROOT . DIR_SEP . DATA_FOLDER . DIR_SEP;
+					$_FILE		 = $_FILES[0];
+					$file_handle = fopen($_FILE['tmp_name'], 'a+');
+					if ($imagick->readImageFile($file_handle)) {
+						$hash		 = $imagick->getImageSignature();
+						$ext		 = strtolower($imagick->getImageFormat());
+						$file		 = $hash . "." . $ext;
+						$filePath	 = $path . $file;
+
+						if (!is_file($filePath))
+							move_uploaded_file($_FILE['tmp_name'], $filePath);
+						else
+							unlink($_FILE['tmp_name']);
+
+						$tile = [
+							'posX'	 => $posX,
+							'posY'	 => $posY,
+							'hash'	 => $hash,
+							'file'	 => $file,
+							'size'	 => filesize($filePath),
+							'date'	 => filemtime($filePath),
+						];
+
+						$response['maps'][$mapId]['tiles'][$coords]	 = $tile;
+						$DATA['maps'][$mapId]['tiles'][$coords]		 = $tile;
+
+						$DATA['maps'][$mapId]['hash'] = sha1(json_encode($DATA['maps'][$mapId]));
+						header("new-hash: {$DATA['maps'][$mapId]['hash']}");
+
+						$JSON = json_encode($DATA);
+						file_put_contents(MAPS_STORAGE_FILE, $JSON);
 					}
-					die(json_encode($filename));
 				}
+				die(json_encode($response));
 				break;
 
 			case "del":
@@ -159,9 +197,10 @@ if (isset($_HEADER['X-Requested-With']) && $_HEADER['X-Requested-With'] == "XMLH
 		}
 		die(json_encode(false));
 	}
+	die(false);
 }
 
-include("map.html");
+include("../map.html");
 
 /* * *****************************************************************************************************************************************************************************************************
  * TRASH

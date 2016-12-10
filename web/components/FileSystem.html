@@ -1,0 +1,465 @@
+ 
+//<script type="text/javascript">
+	'use strict';
+
+	if (typeof (PERSISTENT) === "undefined")
+		this.PERSISTENT = 1;
+	if (typeof (TEMPORARY) === "undefined")
+		this.TEMPORARY = 1;
+
+	this.FileSystem = (function () {
+
+		function FileSystem(_type, _bytes, _debug) {
+			if (requestFileSystem === undefined)
+				return false;
+
+			var self = this;
+			var bytes = typeof (_bytes) === undefined ? 0 : _bytes;
+			self.debug = typeof (_debug) === undefined ? false : _debug;
+			self.remainigBytes = self.grantedBytes = self.usedBytes = null;
+			self.type = _type;
+			self.root = false;
+			self.realFileSystem = false;
+//			self.reqUsage = self.queryUsageAndQuota()
+//				.then(function (self) {
+//					self.reqUsage = false;
+//					return self.requestFileSystem(Math.max(bytes, self.grantedBytes));
+//				});
+
+//			Object.defineProperties(this, {
+//				granted: {
+//					enumerable: true,
+//					get: function () {
+//						if (self.grantedBytes === null) {
+//							return self.queryUsageAndQuota()
+//								.then(function (self, _usedBytes, _grantedBytes, _remainigBytes) {
+//									return _grantedBytes;
+//								});
+//						} else {
+//							return self.grantedBytes;
+//						}
+//					}
+//				},
+//				remainig: {
+//					enumerable: true,
+//					get: function ()  {
+//						if (self.remainigBytes === null) {
+//							return self.queryUsageAndQuota()
+//								.then(function (self, _usedBytes, _grantedBytes, _remainigBytes) {
+//									return _remainigBytes;
+//								});
+//						} else {
+//							return self.remainigBytes;
+//						}
+//					}
+//				},
+//				used: {
+//					enumerable: true,
+//					get: function () {
+//						if (self.usedBytes === null) {
+//							return self.queryUsageAndQuota()
+//								.then(function (self, _usedBytes, _grantedBytes, _remainigBytes) {
+//									return _usedBytes;
+//								});
+//						} else {
+//							return self.usedBytes;
+//						}
+//					}
+//				},
+//			});
+			return this;
+		}
+
+		FileSystem.format = function (_bytes) {
+			var sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+			if (_bytes === 0)
+				return '0 Byte';
+			var i = parseInt(Math.floor(Math.log(_bytes) / Math.log(1024)));
+			return Math.round(_bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
+		};
+
+		FileSystem.unformat = function (_str) {
+			var sizes = {'': 0, Bytes: 0, K: 1000, KB: 1024, M: Math.pow(1000, 2), MB: Math.pow(1024, 2), G: Math.pow(1000, 3), GB: Math.pow(1024, 3), T: Math.pow(1000, 4), TB: Math.pow(1024, 4)};
+			var match = /([\d.]+)\s*(\w+)/i.exec(_str);
+			return match === null || match[2] === undefined || sizes[match[2]] === undefined ? false : parseFloat(match[1]) * sizes[match[2]];
+		};
+
+		FileSystem.prototype = {
+			queryUsageAndQuota: function () {
+				var self = this;
+				return new Promise(function (_resolve, _reject) {
+					var success = function (_usedBytes, _grantedBytes) {
+						self.grantedBytes = _grantedBytes;
+						self.usedBytes = _usedBytes;
+						self.remainigBytes = _grantedBytes - _usedBytes;
+						if (self.debug)
+							console.log("currently granted:", FileSystem.format(self.grantedBytes), "used:", FileSystem.format(self.usedBytes), "remainig:", FileSystem.format(self.remainigBytes));
+						_resolve(self, self.usedBytes, self.grantedBytes, self.remainigBytes);
+					};
+					var failture = function (e) {
+						_reject(fsError(e, 'queryUsageAndQuota'), e, self);
+					};
+					switch (self.type) {
+						case PERSISTENT:
+							navigator.persistentStorage.queryUsageAndQuota(success, failture);
+							break;
+						case TEMPORARY:
+							navigator.temporaryStorage.queryUsageAndQuota(success, failture);
+							break;
+						default:
+							_reject('INVALID_STATE_ERR', {}, self);
+					}
+				});
+			},
+			requestQuota: function (_bytes) {
+				console.log("queryUsageAndQuota:", _bytes);
+				var self = this;
+				return new Promise(function (_resolve, _reject) {
+					if (self.grantedBytes === null) {
+						return self.queryUsageAndQuota()
+							.then(function (self) {
+								return self.requestQuota(_bytes)
+							}, _reject)
+							.then(_resolve, _reject);
+					}
+
+					var bytes = typeof (_bytes) === undefined ? 0 : _bytes;
+					var requestBytes = self.usedBytes + bytes;
+					if (self.debug)
+						console.log("request Bytes:", FileSystem.format(bytes), "with used: ", FileSystem.format(requestBytes));
+					var success = function (_grantedBytes) {
+						self.grantedBytes = _grantedBytes;
+						self.remainigBytes = self.grantedBytes - self.usedBytes;
+						if (self.debug)
+							console.log("now granted:", FileSystem.format(self.grantedBytes), "remainig:", FileSystem.format(self.remainigBytes));
+						_resolve(self, _grantedBytes);
+					};
+					var failture = function (e) {
+						_reject(fsError(e, 'requestQuota'), e, self);
+					};
+					switch (self.type) {
+						case PERSISTENT:
+							navigator.persistentStorage.requestQuota(requestBytes, success, failture);
+							break;
+						case TEMPORARY:
+							navigator.temporaryStorage.requestQuota(requestBytes, success, failture);
+							break;
+						default:
+							_reject('INVALID_STATE_ERR', {}, self);
+					}
+				});
+			},
+			requestFileSystem: function (_bytes) {
+				var self = this;
+				var bytes = typeof (_bytes) === undefined ? 0 : _bytes;
+				var failture = function (e) {
+					_reject(fsError(e, 'requestFileSystem'), e, self);
+				};
+				return new Promise(function (_resolve, _reject) {
+					if (self.remainigBytes < bytes) {
+						self.requestQuota(self.remainigBytes + bytes)
+							.then(function (self, _grantedBytes) {
+								self.requestFileSystem(_grantedBytes)
+									.then(_resolve, _reject);
+							}, _reject);
+					}
+					requestFileSystem(self.type, self.bytes, function (_fs) {
+						self.realFileSystem = _fs;
+						if (self.debug)
+							console.log("requestFileSystem: ", self.realFileSystem);
+
+						self.realFileSystem.root
+							.getMetadata(function (_meta) {
+								self.root = new Directory(self.realFileSystem.root, _meta, self.realFileSystem);
+								return _resolve(self, self.root, self.realFileSystem);
+							});
+					}, failture);
+				});
+			},
+			getDirectory: function (_name, _create) {
+				var self = this;
+				return new Promise(function (_resolve, _reject) {
+					if (self.realFileSystem === false || self.root === false) {
+						return self.requestFileSystem()
+							.then(function (self) {
+								return self.getDirectory(_name, _create)
+									.then(_resolve, _reject);
+							}, _reject);
+					}
+					return self.root
+						.getDirectory(_name, _create)
+						.then(_resolve, _reject);
+				});
+			},
+			getFile: function (_name, _create) {
+				var self = this;
+				return new Promise(function (_resolve, _reject) {
+					if (self.realFileSystem === false || self.root === false) {
+						return self.requestFileSystem()
+							.then(function (self) {
+								return self.getFile(_name, _create)
+									.then(_resolve, _reject);
+							}, _reject);
+					}
+					return self.root.getFile(_name, _create)
+						.then(_resolve, function (e) {
+							_reject(new Error(e + " Datei " + _name +  " / Create " + (_create === true ? 1 : 0)));
+						});
+				});
+			}
+		};
+		function Directory(_directory, _meta, _fileSystem) {
+			var self = this;
+			if (self.debug)
+				console.log("Directory\n", _directory, _fileSystem);
+			self.realFileSystem = _fileSystem;
+			self.realDirectory = _directory;
+			self.realMeta = _meta;
+			Object.defineProperties(this, {
+				url: {
+					enumerable: true,
+					get: function () {
+						return self.realDirectory.toURL();
+					}
+				},
+				name: {
+					enumerable: true,
+					get: function () {
+						return self.realDirectory.name;
+					}
+				},
+				fullPath: {
+					enumerable: true,
+					get: function () {
+						return self.realDirectory.fullPath;
+					}
+				},
+				isDirectory: {
+					enumerable: true,
+					get: function () {
+						return self.realDirectory.isDirectory;
+					}
+				},
+				isFile: {
+					enumerable: true,
+					get: function () {
+						return self.realDirectory.isFile;
+					}
+				},
+				meta: {
+					enumerable: true,
+					get: function () {
+						return self.realMeta;
+					}
+				}
+			});
+			return this;
+		}
+		Directory.prototype = {
+			getDirectory: function (_name, _create) {
+				var self = this;
+				var name = _name === undefined ? "" : _name;
+				var create = _create === undefined ? "" : _create;
+				return new Promise(function (_resolve, _reject) {
+					if (name === "") {
+						self.realDirectory = self.realFileSystem.root;
+						return _resolve(self, self.realDirectory, self.realFileSystem);
+					}
+					self.realDirectory.getDirectory(name, {
+						create: create
+					}, function (_dir) {
+						_dir.getMetadata(function (_meta) {
+							return _resolve(new Directory(_dir, _meta, self.realFileSystem), _dir, _meta, self.realFileSystem);
+						});
+					}, function (e) {
+						return _reject(fsError(e, 'getDirectory(' + name + ')'), e, self);
+					});
+				});
+			},
+			readEntries: function () {
+				var self = this;
+				return new Promise(function (_resolve, _reject) {
+					var reader = self.realDirectory.createReader();
+					reader.readEntries(function (_results) {
+						var results = Array.prototype.slice.call(_results || [], 0);
+						var promises = [];
+
+						results.forEach(function (_entry) {
+							promises.push(new Promise(function (_resolve, _reject) {
+								switch (true) {
+									case _entry.isDirectory:
+										_entry.getMetadata(function (_meta) {
+											_resolve(new Directory(_entry, _meta, self.realFileSystem), _entry, _meta, self.realFileSystem);
+										});
+										break;
+									case _entry.isFile:
+										_entry.getMetadata(function (_meta) {
+											_resolve(new File(_entry, _meta, self.realDirectory, self.realFileSystem), _entry, _meta, self.realDirectory, self.realFileSystem);
+										});
+										break;
+									default:
+										_resolve(_entry);
+								}
+							}));
+						});
+
+						Promise
+							.all(promises)
+							.then(function (_results) {
+								return _resolve(_results);
+							}, _reject);
+
+					}, function (e) {
+						return _reject(fsError(e, 'readEntries()'), e, self);
+					});
+				});
+			},
+			getFile: function (_name, _create) {
+				var self = this;
+				var name = _name === undefined ? "" : _name;
+				var create = _create === undefined ? false : _create;
+				return new Promise(function (_resolve, _reject) {
+					self.realDirectory.getFile(name, {
+						create: create,
+						exclusive: false
+					}, function (_file) {
+						_file.getMetadata(function (_meta) {
+							var file = new File(_file, _meta, self.realDirectory, self.realFileSystem);
+							_resolve(file, _file, _meta);
+						});
+					}, function (e) {
+						_reject(fsError(e, 'getFile'), e, self);
+					});
+				});
+			}
+		};
+		function File(_file, _meta, _directory, _fileSystem) {
+			var self = this;
+			if (self.debug)
+				console.log("File\n", _file, _meta, _directory, _fileSystem);
+			self.realFileSystem = _fileSystem;
+			self.realDirectory = _directory;
+			self.realFile = _file;
+			self.realMeta = _meta;
+			Object.defineProperties(this, {
+				url: {
+					enumerable: true,
+					get: function () {
+						return self.realFile.toURL();
+					}
+				},
+				name: {
+					enumerable: true,
+					get: function () {
+						return self.realFile.name;
+					}
+				},
+				fullPath: {
+					enumerable: true,
+					get: function () {
+						return self.realFile.fullPath;
+					}
+				},
+				isDirectory: {
+					enumerable: true,
+					get: function () {
+						return self.realFile.isDirectory;
+					}
+				},
+				isFile: {
+					enumerable: true,
+					get: function () {
+						return self.realFile.isFile;
+					}
+				},
+				meta: {
+					enumerable: true,
+					get: function () {
+						return self.realMeta;
+					}
+				}
+			});
+			return this;
+		}
+
+		File.prototype = {
+			write: function (_content) {
+				var self = this;
+				var content = _content === undefined ? "" : _content;
+				return new Promise(function (_resolve, _reject) {
+					self.realFile.createWriter(function (writer) {
+						writer.onwrite = function (e) {
+//							console.log("do write.", self.realFile.fullPath, e);
+						};
+						writer.onwriteend = function (e) {
+//							console.log("Write completed.", self.realFile.fullPath, e);
+							_resolve(e);
+						};
+						writer.onerror = function (e) {
+//							console.log("Write error: ", self.realFile.fullPath, e);
+							_reject(e);
+						};
+						writer.write(content);
+					}, function () {
+
+					});
+				});
+			}
+		};
+		var fsError = function (e, o) {
+//			console.log("fsError", e);
+			var msg = e.name + ': ' + e.message;
+			var obj = o === undefined ? '' : '->' + o;
+//			console.log('[FileSystem' + obj + '] ' + msg);
+			return msg;
+		};
+		navigator.persistentStorage = navigator.persistentStorage || navigator.webkitPersistentStorage || {
+			requestQuota: function (askQuota, callback) {
+				if (typeof (navigator.webkitPersistentStorage) !== "undefined" && typeof (navigator.webkitPersistentStorage.requestQuota) !== "undefined") {
+					return navigator.webkitPersistentStorage.requestQuota(askQuota, callback);
+				} else if (typeof (window.webkitStorageInfo) !== "undefined" && typeof (window.webkitStorageInfo.requestQuota) !== "undefined") {
+					return window.webkitStorageInfo.requestQuota(PERSISTENT, askQuota, callback);
+				}
+				throw "navigator.persistentStorage.requestQuota is not defined";
+			},
+			queryUsageAndQuota: function (responseCallback, errorCallback) {
+				if (typeof (navigator.webkitPersistentStorage) !== "undefined" && typeof (navigator.webkitPersistentStorage.queryUsageAndQuota) !== "undefined") {
+					return navigator.webkitPersistentStorage.queryUsageAndQuota(responseCallback, errorCallback);
+				} else if (typeof (window.webkitStorageInfo) !== "undefined" && typeof (window.webkitStorageInfo.queryUsageAndQuota) !== "undefined") {
+					return window.webkitStorageInfo.queryUsageAndQuota(PERSISTENT, responseCallback, errorCallback);
+				}
+				throw "navigator.persistentStorage.queryUsageAndQuota is not defined";
+			}
+		};
+		navigator.temporaryStorage = navigator.temporaryStorage || navigator.webkitTemporaryStorage || {
+			requestQuota: function (askQuota, callback) {
+				if (typeof (navigator.webkitTemporaryStorage) !== "undefined") {
+					return navigator.webkitTemporaryStorage.requestQuota(askQuota, callback);
+				} else if (typeof (window.webkitStorageInfo) !== "undefined") {
+					return window.webkitStorageInfo.requestQuota(TEMPORARY, askQuota, callback);
+				}
+				throw "navigator.temporaryStorage.requestQuota is not defined";
+			},
+			queryUsageAndQuota: function (responseCallback, errorCallback) {
+				if (typeof (navigator.webkitTemporaryStorage) !== "undefined" && typeof (navigator.webkitTemporaryStorage.queryUsageAndQuota) !== "undefined") {
+					return navigator.webkitTemporaryStorage.queryUsageAndQuota(responseCallback, errorCallback);
+				} else if (typeof (window.webkitStorageInfo) !== "undefined" && typeof (window.webkitStorageInfo.queryUsageAndQuota) !== "undefined") {
+					return window.webkitStorageInfo.queryUsageAndQuota(TEMPORARY, responseCallback, errorCallback);
+				}
+				throw "navigator.temporaryStorage.queryUsageAndQuota is not defined";
+			}
+		};
+		if (typeof (window) !== "undefined") {
+			var requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
+			var resolveLocalFileSystemURL = window.resolveLocalFileSystemURL || window.webkitResolveLocalFileSystemURL;
+		} else {
+			var requestFileSystem =
+				typeof (requestFileSystem) !== "undefined" ? requestFileSystem :
+				typeof (webkitRequestFileSystem) !== "undefined" ? webkitRequestFileSystem : undefined;
+			var resolveLocalFileSystemURL =
+				typeof (resolveLocalFileSystemURL) !== "undefined" ? resolveLocalFileSystemURL :
+				typeof (webkitResolveLocalFileSystemURL) !== "undefined" ? webkitResolveLocalFileSystemURL : undefined;
+		}
+		return (FileSystem);
+	}).call(this);
+//</script>

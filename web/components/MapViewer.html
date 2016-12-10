@@ -1,0 +1,1517 @@
+
+<link rel="import" href="ExtendedAPI.html">
+<link rel="import" href="Ease.html">
+<link rel="import" href="MapViewerFunctions.html">
+<link rel="import" href="ScriptPath.html">
+<link rel="import" href="Pointers.html">
+<link rel="import" href="FileSystem.html">
+<link rel="import" href="XHR.html">
+<link rel="import" href="WorkerController.html">
+<link rel="import" href="Color.html">
+<link rel="import" href="OneClickEdit.html">
+<link rel="import" href="popupmenu.html">
+<template class="PY-MapViewerTemplate">
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+		}
+		table {
+			border: 0;
+		}
+		dialog {
+			margin: auto;
+			margin-top: 20px;
+			position: absolute;
+			top: 0; left: 0; bottom: 0; right: 0;
+			z-index: 9999;
+		}
+		.PY-MapViewerWrapper, .MapViewer {
+			width: 100%;
+			height: 100%;
+		}
+		.PY-MapViewerWrapper {
+			background: #000;
+		}
+		#PY-MapViewerCanvas {
+			width: 100%;
+			height: 100%;
+		}
+		#PY-MapIdSwitchWrapper {
+			position: absolute;
+			top: 15px;
+			left: 10px;
+			background: #FFF;
+			padding: 3px;
+			border-radius: 5px;
+		}
+		#PY-CompareStatus {
+			position: absolute;
+			top: 15px;
+			margin: auto;
+			left: 0;
+			right: 0;
+			background: #FFF;
+		}
+
+		#PY-POIListWrapper {
+			position: absolute;
+			display: inline-block;
+			width: auto;
+			left: 0px;
+			top: 50px;
+		}
+		#PY-POIList {
+			position: relative;
+			background: #FFF;
+			padding: 10px;
+			border-radius: 0 10px 10px 0;
+		}
+
+		#PY-POIList {
+			left: calc(10px - 100%);
+			transition: 0.5s;
+		}
+		#PY-POIList:hover, #PY-POIList:focus {
+			left: 0;
+		}
+		#PY-POIList>* {
+			cursor: pointer;
+		}
+		#PY-POIList>*:hover {
+			text-decoration: underline;
+		}
+
+		#PY-Status {
+			position: absolute;
+			bottom: 5px;
+			right: 5px;
+			color: #FFF;
+		}
+		.PY-MapViewerLeftBar {
+			position: absolute;
+			left: 15px;
+			top: 5%;
+			width: 40px;
+			z-index: 9999;
+		}
+		.ui-slider-vertical {
+			height: 300px !important;
+		}
+		.PY-MapViewerCenterBar {
+			display: inline-block;
+			position: absolute;
+			top: 50%;
+			left: 50%;
+		}
+		.PY-MapViewerCenterBar>.PY-MapViewerCenterBarInner {
+			display: inline-block;
+			margin: -50% 0 0 -50%;
+		}
+		.progressbar {
+			width: 500px;
+		}
+
+		/*	ALL */
+		.OneClickEdit {cursor: pointer;}
+		.OneClickEdit:hover {text-decoration: underline;}
+
+		/*	INPUT	*/
+		.OneClickEdit-input {border: 0;}
+
+		/*	SELECT	*/
+		.OneClickEdit-select {position: relative;}
+		.OneClickEdit-group {display: block; position: absolute;top: 90%;left: 0; color: #000; border-radius: 4px;padding:2px 5px;background: black;background: rgba(255, 255, 255, 0.7);
+							 filter: progid:DXImageTransform.Microsoft.Gradient(GradientType=0, StartColorStr='#B2FFFFFF', EndColorStr='#B2FFFFFF');}
+		.OneClickEdit-group span {display: block; cursor: pointer; padding:0 5px; margin: 0 -5px; }
+		.OneClickEdit-element:hover, .OneClickEdit-text:hover{background: rgba(0, 0, 0, 0.2);
+															  filter: progid:DXImageTransform.Microsoft.Gradient(GradientType=0, StartColorStr='#6E000000', EndColorStr='#6E000000');}
+		.OneClickEdit-subgroup {display: block;background: rgba(0, 0, 0, 0.15);}
+		/* choose different colors for every layer */
+		.deep-1{filter: progid:DXImageTransform.Microsoft.Gradient(GradientType=0, StartColorStr='#50000000', EndColorStr='#50000000');}
+		.deep-2 {filter: progid:DXImageTransform.Microsoft.Gradient(GradientType=0, StartColorStr='#30000000', EndColorStr='#30000000');}
+
+	</style>
+
+	<div class="PY-MapViewerWrapper">
+		<canvas id="PY-MapViewerCanvas">Dein Browser kann diese Grafik nicht darstellen.</canvas>
+		<!--		<menu type="context" id="PY-Contextmenu">
+				<canvas id="PY-MapViewerCanvas" contextmenu="PY-Contextmenu">Dein Browser kann diese Grafik nicht darstellen.</canvas>
+					<menuitem label="Refresh Post" onclick="window.location.reload();" ></menuitem>
+					<menuitem label="Skip to Comments" onclick="window.location='#comments';"></menuitem>
+				</menu>-->
+		<span id="PY-CompareStatus"></span>
+		<div id="PY-POIListWrapper">
+			<ul id="PY-POIList"></ul>
+		</div>
+		<span id="PY-Status"></span>
+		<span id="PY-MapIdSwitchWrapper">
+			<span id="PY-MapIdSwitch"></span>
+		</span>
+		<dialog id="PY-UploadDialog">
+			<p>Soll die Änderung der Karte gespeichert werden?</p>
+			<form method="dialog">
+				<button type="submit" value="1">Speichern</button>
+				<button type="submit" value="0">Abbruch</button>
+			</form>
+		</dialog>
+	</div>
+</template>
+
+<script>
+	// Godtuwn
+	'use strict';
+	var defaultConfig = {
+		appName: 'PY-MapViewer',
+		ease: Ease.easeInOutQuad,
+		easeTime: 2000,
+		defaultQuota: "1MB",
+		imgPath: 'data',
+		size: 100,
+		scaleStep: 0.2,
+		imgLoadMax: 5,
+		keyMovementFactor: 1,
+		regNameMap: /^\w+_(\-?\d+)_(\-?\d+)\.\w+$/,
+		regCoordKey: /(\-?\d+)_(\-?\d+)$/,
+		targetTileColor: '#FFF'
+	};
+	var PYMapViewerClass = function () {
+		var self = this;
+		/*
+		 * DEFINE VARIABLES
+		 */
+		// config
+		var conf = {}, l;
+		for (var a in defaultConfig) {
+			conf[a] = self.dataset[a] !== undefined ? self.dataset[a] : self.dataset[l = a.toLowerCase()] !== undefined ? self.dataset[l] : defaultConfig[a];
+		}
+		if (typeof (conf.regNameMap) === "string")
+			conf.regNameMap = new RegExp(conf.regNameMap);
+		self.config = conf;
+		var appName = conf.appName;
+		// prepare objects
+		var storage = localStorage;
+		var fs = false;
+		if (typeof (FileSystem) !== "undefined") {
+			fs = new FileSystem(PERSISTENT);
+		}
+		// zero values
+		var win = self.getBoundingClientRect();
+		self.maps = {};
+		self.mapId = null;
+		self.map = null;
+		var logMouse = false;
+		//		var build = undefined;
+		//		var slider = false, center = false, progress = false;
+		//		var canvas = conf.canvas, c2d = false;
+		//		var winW = 0, winH = 0, cX = 0, cY = 0, sX = 0, sY = 0;
+		//		var imgs = {}, currentMap = {};
+		//		var scale = 0, cScale = 1;
+		//		var d = {t: 0, r: 0, b: 0, l: 0, cX: 0, cY: 0};
+
+		/*
+		 * EVENTS
+		 */
+
+		function stopPropagation(e) {
+			if (!e)
+				e = window.event;
+
+			//IE9 & Other Browsers
+			if (e.stopPropagation) {
+				e.stopPropagation();
+			}
+			//IE8 and Lower
+			else {
+				e.cancelBubble = true;
+			}
+			// ???
+			if (e.preventDefault) {
+				e.preventDefault();
+			}
+
+			return false;
+		}
+
+		var alertError = function (_e) {
+			if (_e instanceof Error) {
+				console.log(_e.stack);
+			} else {
+				console.log(_e);
+			}
+		};
+
+		function dialog(_dialog) {
+			var name = _dialog === undefined ? null : _dialog;
+			return new Promise(function (_resolve, _reject) {
+				if (name === null)
+					return _reject(new Error("missing Dialog-Name"));
+				var dialog = root.querySelector("dialog#PY-" + name);
+				if (dialog === null)
+					return _reject(new Error("Dialog " + name + " does not exist!"));
+				dialog.addEventListener("close", function (e) {
+					return _resolve(this.returnValue);
+				}, false);
+				dialog.showModal();
+				dialog.show();
+			});
+		}
+
+
+		// Hash
+//		var skipHashChange = false;
+		self.onHashChange = function () {
+//			if (skipHashChange) {
+//				skipHashChange = false;
+//				return;
+//			}
+//			var r = /^[#]([-0-9]+)[:]([-0-9]+)[:]([-0-9]+)$/.exec(window.location.hash);
+//			if (Array.isArray(r)) {
+//				map.x = parseInt(r[1]);
+//				map.y = parseInt(r[2]);
+//				map.scale = parseInt(r[3]);
+////				if (slider)
+////					slider.slider("value", scale);
+//				m.scale = Math.pow(1 - self.config.scaleStep, scale);
+//				//				calcPos(false);
+//			}
+		};
+		// resize
+		self.onResize = function (e) {
+			win = self.getBoundingClientRect();
+			canvas.width = win.width;
+			canvas.height = win.height;
+			c2d.translate(win.width / 2, win.height / 2);
+			self.animate().catch(alertError);
+		};
+		// Pointer Handling
+		self.pointers = new Pointers();
+		self.allowPointerMove = false;
+		self.allowPointerZoom = false;
+		self.inAnimation = false;
+		self.pointerCount = 0;
+		// MOVE
+		self.onMouseMove = function (e) {
+			if (logMouse) console.log("onMouseMove");
+			if (self.allowPointerMove) {
+				self.pointers.importMouse(e);
+			} else {
+				self.pointers.importMouse(e, true).clearDiff();
+			}
+
+			if (self.allowPointerMove && !self.inAnimation) {
+				self.animate().catch(alertError);
+			}
+
+			if (self.map !== null) {
+				var x = (self.map.mouseX = Math.round(((e.clientX - win.left) - win.width / 2) / self.map.factor + self.map.x)) / self.config.size;
+				var y = (self.map.mouseY = Math.round(((e.clientY - win.top) - win.height / 2) / self.map.factor + self.map.y)) / self.config.size;
+				self.status.innerText = "Coords: " + x.toPrecision(3) + ", " + y.toPrecision(3);
+			}
+			return false;
+		};
+		self.onTouchMove = function (e) {
+			self.pointers.importTouches(e.touches);
+			switch (self.pointers.length) {
+				case 1:
+					if (self.allowPointerMove && !self.inAnimation) {
+						self.animate().catch(alertError);
+					}
+					return false;
+				case 2:
+					self.allowPointerZoom = true;
+					break;
+				default:
+			}
+		};
+		// START
+		self.onMouseDown = function (e) {
+			if (logMouse) console.log("onMouseDown");
+			stopPropagation(e);
+			self.pointers.importMouse(e, true).clearDiff();
+			switch (e.button) {
+				default:
+					break;
+				case 0:
+					self.allowPointerMove = true;
+			}
+			return false;
+		};
+		self.onTouchStart = function (e) {
+			var evt = e;
+			var touches = evt.touches;
+			self.pointers.importTouches(touches);
+			switch (self.pointerCount = touches.length) {
+				case 1:
+					self.allowPointerMove = true;
+					return false;
+				case 2:
+					self.allowPointerZoom = true;
+					break;
+				default:
+			}
+		};
+
+		// END
+		self.endMove = function (e) {
+			var p = self.pointers[0];
+			if (p.isClick()) {
+//				markPos(Math.round(((p.mX - win.w / 2) / self.map.scale - self.map.x - size / 2) / size), Math.round(((p.mY - win.h / 2) / self.map.scale - self.map.y - size / 2) / size));
+			} else if (self.allowPointerMove && self.map !== null) {
+				self.map.x = self.map.x + Math.round((p.diffX()) / self.map.factor);
+				self.map.y = self.map.y + Math.round((p.diffY()) / self.map.factor);
+			} else {
+
+			}
+			self.allowPointerMove = false;
+			return false;
+		};
+
+		self.onTouchEnd = function (e) {
+			self.pointers.importTouches(e.touches);
+			switch (self.pointerCount) {
+				case 1:
+					return self.endMove(e);
+				case 2:
+					return false;
+				default:
+			}
+		};
+		self.onMouseUp = function (e) {
+			if (logMouse) console.log("onMouseUp");
+			self.pointers.importMouse(e);
+			switch (e.button) {
+				default:
+					break;
+				case 0:
+					return self.endMove(e);
+				case 1:
+					self.map.scale = 0;
+//					if (slider)
+//						slider.slider("value", scale);
+					self.animate().catch(alertError);
+					return false;
+			}
+			return true;
+		};
+		// Weel
+		self.onMouseWheel = function (e) {
+			var e = window.event || e;
+			var delta = Math.max(-1, Math.min(1, (e.wheelDeltaY || e.wheelDelta || -e.detail)));
+			self.map.scale -= delta;
+//			if (slider)
+//				slider.slider("value", scale);
+			self.animate().catch(alertError);
+		};
+		// Keyboard
+		self.kd = [];
+		self.kX = 0;
+		self.kY = 0;
+		self.keyPress = true;
+		self.shiftKey = false;
+		self.allowKeyMove = false;
+		self.onKeyDown = function (_e) {
+			if (_e.repeat === undefined) {
+				_e.repeat = !(keyPress = (self.kd[_e.keyCode] === undefined));
+			}
+			if (!_e.repeat || self.kd[_e.keyCode] === undefined) {
+				self.kd[_e.keyCode] = (new Date).getTime();
+				switch (_e.keyCode) {
+					case 38: // OBEN
+					case 40: // UNTEN
+					case 39: // LINKS
+					case 37: // RECHTS
+						self.allowKeyMove = true;
+						self.map.y = self.map.y + (self.kY = _e.keyCode === 40 ? 1 : _e.keyCode === 38 ? -1 : 0) * (_e.shiftKey ? 1 : self.config.keyMovementFactor);
+						self.map.x = self.map.x + (self.kX = _e.keyCode === 39 ? 1 : _e.keyCode === 37 ? -1 : 0) * (_e.shiftKey ? 1 : self.config.keyMovementFactor);
+						break;
+				}
+			}
+			if (!self.inAnimation && (self.allowKeyMove || self.shiftKey !== _e.shiftKey)) {
+				self.shiftKey = _e.shiftKey;
+				self.animate().catch(alertError);
+			}
+		};
+		self.onKeyUp = function (_e) {
+			var delta = 0;
+			switch (_e.keyCode) {
+				case 38: // OBEN
+				case 40: // UNTEN
+				case 39: // LINKS
+				case 37: // RECHTS
+					// Deaktivieren, wenn keine weitere Richtungstaste aktiv
+					self.allowKeyMove = false;
+					self.kd.forEach(function (_time, _key) {
+						switch (_key) {
+							case 38: // OBEN
+							case 40: // UNTEN
+							case 39: // LINKS
+							case 37: // RECHTS
+								self.allowKeyMove = true;
+								break;
+						}
+					});
+					break;
+				case 107: // +
+					delta = -1;
+					break;
+				case 109:// -
+					delta = 1;
+					break;
+				case 13:
+				case 10: // ENTER
+					if (_e.ctrlKey) {
+						if (!document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement) {
+							if (document.documentElement.requestFullscreen) {
+								document.documentElement.requestFullscreen();
+							} else if (document.documentElement.mozRequestFullScreen) {
+								document.documentElement.mozRequestFullScreen();
+							} else if (document.documentElement.webkitRequestFullscreen) {
+								document.documentElement.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
+							}
+						} else {
+							if (document.cancelFullScreen) {
+								document.cancelFullScreen();
+							} else if (document.mozCancelFullScreen) {
+								document.mozCancelFullScreen();
+							} else if (document.webkitCancelFullScreen) {
+								document.webkitCancelFullScreen();
+							}
+						}
+					}
+					break;
+				case 46: // DEL
+//					var del = confirm('Kachel l�schen?');
+//					if (del) {
+//						$.getJSON(location.href, {
+//							'a': 'del',
+//							'x': sX,
+//							'y': sY
+//						}, function (data) {
+//							reload();
+//						});
+//					}
+					break;
+				case 16: // shift
+					break;
+				default:
+					console.log("unknown key: " + _e.keyCode);
+					return true;
+			}
+
+			self.map.scale += delta;
+////				if (slider)
+////					slider.slider("value", scale);
+			self.shiftKey = _e.shiftKey;
+			self.animate().catch(alertError);
+			delete (self.kd[_e.keyCode]);
+		};
+		self.onMouseOver = function (e) {
+			self.status.style.display = "";
+		};
+		self.onMouseOut = function (e) {
+			self.status.style.display = "none";
+		};
+		/*
+		 * ******************* DRAG & DROP ***********************************************************************************************************************
+		 */
+
+		self.onDragOver = function (e) {
+			stopPropagation(e);
+			self.classList.add("dropover");
+		};
+		self.onDragLeave = function (e) {
+			stopPropagation(e);
+			self.classList.remove("dropover");
+		};
+		self.onDrop = function (_e) {
+			var waypoint = _e.dataTransfer.getData("waypoint");
+			if (waypoint) {
+				self.POIRemove(waypoint);
+			}
+
+			console.log("drop", _e.dataTransfer, waypoint);
+			stopPropagation(_e);
+			// canvas.css({
+			// cursor : 'wait'
+			// });
+			self.classList.remove("dropover");
+			var _files = false;
+			switch (true) {
+				case (!!_e.origina0lEvent && !!_e.originalEvent.dataTransfer && !!_e.originalEvent.dataTransfer.files):
+					_files = _e.originalEvent.dataTransfer.files;
+					break;
+				case (!!_e.target.files):
+					_files = _e.target.files;
+					break;
+				case (!!_e.dataTransfer && !!_e.dataTransfer.files):
+					_files = _e.dataTransfer.files;
+					break;
+				default:
+			}
+			var files = Array.isArray(_files) ? _files : _files instanceof FileList ? Array.prototype.slice.call(_files) : [];
+			if (files.length === 0) {
+				return;
+			}
+			console.log("files dropped", files);
+//			var map = self.createMap(files);
+			var promises = [];
+			files.forEach(function (file, idx) {
+				promises.push(self.loadCanvas(file)
+					.then(function (canvas) {
+						var r = self.config.regNameMap.exec(file.name);
+						return Promise.resolve({
+							date: file.lastModified,
+							size: file.size,
+							file: file,
+							posX: parseInt(r[1]),
+							posY: parseInt(r[2]),
+							coords: r[1] + "_" + r[2],
+							canvas: canvas,
+							data: canvas.data
+						});
+					}, alertError));
+			});
+
+			Promise
+				.all(promises)
+				.then(function (tiles) {
+					var nMap = {tiles: {}}, cMap = self.map, ret = false;
+					tiles.forEach(function (tile) {
+						nMap.tiles[tile.coords] = tile;
+					});
+					var g = tileGen(Math.round(cMap.x / 100) * -1, Math.round(cMap.y / 100) * -1);
+					var num = 0, max = Object.keys(cMap.tiles).length;
+
+					function checkNextTile(_match) {
+						var match = _match === undefined ? false : _match;
+						return new Promise(function (_resolve, _reject) {
+							var n;
+							if (typeof (match) === "object") {
+								n = match;
+							} else {
+								n = g.next(match);
+							}
+							if (n.done) _resolve(false);
+							var c = n.value[0] + "_" + n.value[1];
+							if (cMap.tiles[c] !== undefined) {
+								self.loadCanvas(cMap.tiles[c].file, true)
+									.then(function (canvas) {
+//										console.log(max, num, Math.round(100*num/max), num++, Math.round(100*num/max));
+										if (Math.floor(100 * num / max) !== Math.floor(100 * ++num / max)) {
+											console.log("Search Process", Math.floor(100 * num / max), "%");
+										}
+										var next = tiles.every(function (tile) {
+//											var t = (new Date).getTime();
+											compareImageData(canvas.data, tile.data)
+												.then(function (match) {
+//													console.log("checkNextTile", c, tile.coords);
+													if (match <= 5) {
+														var diff = {x: n.value[0] - tile.posX, y: n.value[1] - tile.posY};
+														console.log("checkNextTile", diff, c, tile.coords, match);
+
+														// compare complete map
+														ret = compareMaps(nMap, cMap, diff.x, diff.y)
+															.then(function (match) {
+																if (match <= 5) {
+																	return _resolve(diff, match);
+																}
+																return checkNextTile(true).then(_resolve, _reject);
+															}, _reject);
+														return ret;
+													}
+													return checkNextTile(true).then(_resolve, _reject);
+												}, function (e) {
+													console.log("checkNextTile=>error", e);
+													return checkNextTile(true).then(_resolve, _reject);
+												});
+										});
+										if (next) {
+											return checkNextTile(true).then(_resolve, _reject);
+										} else {
+											return ret;
+										}
+									}, _reject);
+							} else {
+								return checkNextTile(false).then(_resolve, _reject);
+							}
+						});
+					}
+
+					var searchTime = (new Date).getTime();
+					console.log("start search");
+					var p;
+					if (self.shiftKey) {
+						p = Promise.resolve(false);
+					} else {
+						p = checkNextTile(false)
+					}
+					p.then(function (diff) {
+						console.log("finished search", diff, (new Date).getTime() - searchTime);
+						if (diff === false) {
+							var mapID = window.prompt("Create a new Map?");
+							if (mapID !== null && mapID !== "") {
+								self.map = nMap;
+								self.maps[mapId] = self.map;
+								self.build(self.mapId);
+
+								for (var c in nMap.tiles) {
+									var t = nMap.tiles[c];
+									if (t.match === undefined || t.match > 0) {
+										var formData = new FormData();
+										formData.append("a", "upload");
+										formData.append("mapId", self.mapId);
+										formData.append("x", t.posX);
+										formData.append("y", t.posY);
+										formData.append(0, t.file);
+										XHR.post("/", formData)
+											.then(function (response) {
+												try {
+													var respArr = JSON.parse(response);
+													if (typeof (respArr) === "object") {
+														self.merge(respArr);
+														self.worker.post("preload", respArr.maps[self.mapId]);
+													}
+												} catch (e) {
+												}
+												self.animate();
+											}, alertError);
+									}
+								}
+							}
+						} else {
+							nMap.x = self.map.x = diff.x * self.config.size * -1;
+							nMap.y = self.map.y = diff.y * self.config.size * -1;
+//								status.innerText = "Build: " + nMap.x.toPrecision(3) + ", " + nMap.y.toPrecision(3);
+							nMap.scale = self.map.scale;
+							nMap.tiles = {};
+							tiles.forEach(function (tile) {
+								tile.posX += diff.x;
+								tile.posY += diff.y;
+								tile.coords = tile.posX + "_" + tile.posY;
+								nMap.tiles[tile.coords] = tile;
+							});
+							self.build()
+								.then(function () {
+									return self.build(nMap, true);
+								}, alertError)
+								.then(function () {
+									window.reqAnimationFrame(function () {
+										dialog("UploadDialog").then(function (_return) {
+											self.build(false, true);
+											console.log(_return);
+											switch (parseInt(_return)) {
+												case 1:
+												for (var c in nMap.tiles) {
+													var t = nMap.tiles[c];
+													if (t.match === undefined || t.match > 0) {
+														var formData = new FormData();
+														formData.append("a", "upload");
+														formData.append("mapId", self.mapId);
+														formData.append("x", t.posX);
+														formData.append("y", t.posY);
+														formData.append(0, t.file);
+														XHR.post("/", formData)
+															.then(function (response) {
+																try {
+																	var respArr = JSON.parse(response);
+																	if (typeof (respArr) === "object") {
+																		self.merge(respArr);
+																		self.worker.post("preload", respArr.maps[self.mapId]);
+																	}
+																} catch (e) {
+																}
+																self.animate();
+															}, alertError);
+													}
+												}
+											}
+										}, alertError);
+									});
+								}, alertError);
+						}
+					}, alertError);
+				}, alertError);
+		};
+		function compareMaps(_nMap, _cMap, _x, _y) {
+			var t = (new Date).getTime();
+			console.log("start compare map");
+			var promises = [];
+			var nMap = typeof (_nMap) === "object" ? _nMap : {};
+			var cMap = typeof (_cMap) === "object" ? _cMap : {};
+			var x = _x === undefined ? 0 : _x, y = _y === undefined ? 0 : _y;
+			return new Promise(function (_resolve, _reject) {
+				for (var nC in nMap.tiles) {
+					(function (nC) {
+						var nT = nMap.tiles[nC];
+						var cC = (nT.posX + x) + "_" + (nT.posY + y);
+						var cT = cMap.tiles[cC];
+						if (cT !== undefined) {
+							promises.push(new Promise(function (_resolve, _reject) {
+								self.loadCanvas(cT.file, true)
+									.then(function (canvas) {
+										return compareImageData(canvas.data, nT.data).then(function (_match) {
+											return _resolve(nT.match = _match);
+										});
+									}, _reject);
+							}));
+						}
+					})(nC);
+				}
+				Promise.all(promises)
+					.then(function (matches) {
+						var match = matches.reduce(function (a, b) {
+							return a + b;
+						}) / matches.length;
+						console.log("start compare map", ((new Date).getTime()) - t);
+						return _resolve(match, matches);
+					}, _reject);
+			});
+		}
+		function compareImageData(_d1, _d2) {
+			return new Promise(function (_resolve, _reject) {
+				if (!_d1 instanceof Uint8ClampedArray || !_d2 instanceof Uint8ClampedArray || _d1.length !== _d2.length)
+					return _resolve(200);
+
+				if (self.worker) {
+					return self.worker
+						.post("compareImageData", {d1: _d1.buffer, d2: _d2.buffer})
+						.then(_resolve, _reject);
+
+				}
+
+				var d1 = new Uint32Array(_d1.buffer);
+				var d2 = new Uint32Array(_d2.buffer);
+				var d = 0, l = d1.length;
+				var tmp;
+				for (var i = 0; i < l; i++) {
+					var c1 = new Color([(tmp = d1[i]) & 0x000000ff, tmp & 0x0000ff00 >> 8, tmp & 0x00ff0000 >> 16, tmp & 0xff000000 >> 24]);
+					var c2 = new Color([(tmp = d2[i]) & 0x000000ff, tmp & 0x0000ff00 >> 8, tmp & 0x00ff0000 >> 16, tmp & 0xff000000 >> 24]);
+					d += c1.compareWith(c2);
+				}
+				return _resolve(d / l);
+			});
+		}
+
+		/*
+		 * ******************* FUNCTIONS ***********************************************************************************************************************
+		 */
+
+		// load Maps
+		self.loadData = function () {
+			return new Promise(function (_resolve, _reject) {
+				var opt = {header: {}};
+				var lastMod = storage.getItem(appName + "_lastModified");
+				if (lastMod !== null) {
+//					opt.header["If-Modified-Since"] = new Date(parseInt(lastMod) * 1000).toUTCString();
+				}
+				XHR.getJSON("/?a=load", opt)
+					.then(function (_data) {
+						if (_data === null) {
+							return _resolve(_data);
+						}
+
+						if (_data.ts !== undefined) {
+							storage.setItem(appName + "_lastModified", _data.ts);
+						}
+
+						if (_data.maxsize > 0) {
+							var p = Promise.resolve();
+							if (fs.remainigBytes < _data.maxsize)
+								p.then(function () {
+									return fs.requestQuota(_data.maxsize).catch(_reject);
+								}, _reject);
+							return p.then(function () {
+								_resolve(_data);
+							}, _reject);
+						}
+					}, _reject);
+			});
+		};
+
+		self.validateMap = function () {
+			return new Promise(function (_resolve, _reject) {
+				self.isMapBroken = false;
+				self.loadData()
+					.then(function (_data) {
+						if (_data === null)
+							return _resolve([]);
+						//
+						var changed = [];
+						var preload = [];
+						var each = function (_map, n) {
+//							console.log("refresh", self.maps[n].hash !== _map.hash, self.maps[n].hash, _map.hash);
+							if (self.maps[n] === undefined || self.maps[n].hash !== _map.hash) {
+								if (self.maps[n] === undefined)
+									self.maps[n] = {x: 0, y: 0, scale: 0};
+								self.maps[n].tiles = _map.tiles;
+								self.maps[n].hash = _map.hash;
+								storage.setItem(appName + "_maps_" + n, JSON.stringify(self.maps[n]));
+								changed.push(n);
+							}
+
+							if (self.worker) {
+								preload
+									.push(self.worker
+										.post("preload", _data.maps[n])
+										.then(function (data) {
+											if (data) {
+												return Promise.resolve(n, data);
+											} else {
+												return Promise.reject(new Error("Can't load " + n));
+											}
+										}, _reject));
+							}
+						}
+						self.isMapBroken = false;
+
+						if (Array.isArray(_data.maps)) {
+							_data.maps.forEach(each);
+						} else {
+							for (var n in _data.maps) {
+								each(_data.maps[n], n);
+							}
+						}
+
+
+						for (var n in self.maps) {
+							if (_data.maps !== null && _data.maps[n] === undefined) {
+								delete self.maps[n];
+								storage.removeItem(appName + "_maps_" + n);
+							}
+						}
+
+						storage.setItem(appName + "_maps", JSON.stringify(Object.keys(self.maps)));
+						_resolve(changed);
+					}, _reject);
+			});
+		};
+
+		self.animate = function (_targetX, _targetY, _duration, _ease) {
+			var ease = _ease !== undefined ? _ease : self.config.ease;
+			return new Promise(function (_resolve, _reject) {
+				var buildSuccess = null;
+				if (_targetX !== undefined && _targetY !== undefined && !(_targetX === self.map.x && _targetY === self.map.y)) {
+					var duration = _duration !== undefined ? _duration : Math.round(Math.sqrt(Math.pow(_targetX - self.map.x, 2) + Math.pow(_targetY - self.map.y, 2)) / 3);
+					if (typeof (duration) !== "number" || duration <= 0 || typeof (ease) !== "function") {
+						self.map.x = _targetX;
+						self.map.y = _targetY;
+					} else {
+						self.inAnimation = {
+							func: ease,
+							startT: new Date().getTime(),
+							startX: self.map.x,
+							startY: self.map.y,
+							targetX: _targetX,
+							targetY: _targetY,
+							diffX: _targetX - self.map.x,
+							diffY: _targetY - self.map.y,
+							duration: Math.max(500, duration)
+						};
+					}
+				}
+				if (self.allowPointerMove || self.allowKeyMove) {
+					var pointer = self.pointers[0];
+					if (self.allowPointerMove && self.map !== null && pointer !== undefined && (pointer.diffX() !== 0 || pointer.diffY() !== 0)) {
+						self.inAnimation = true;
+						self.map.x -= Math.round(pointer.diffX() / self.map.factor);
+						self.map.y -= Math.round(pointer.diffY() / self.map.factor);
+						pointer.clearDiff();
+					}
+					if (self.allowKeyMove) {
+						self.kd.forEach(function (_time, _key) {
+							self.map.x += (self.kX = _key === 39 ? 1 : _key === 37 ? -1 : 0) * (self.shiftKey ? 1 : self.config.keyMovementFactor);
+							self.map.y += (self.kY = _key === 40 ? 1 : _key === 38 ? -1 : 0) * (self.shiftKey ? 1 : self.config.keyMovementFactor);
+						});
+					}
+					buildSuccess = function (_ret) {
+						if (self.allowPointerMove || self.allowKeyMove) {
+							return self.animate();
+						} else {
+							self.inAnimation = false;
+							return _resolve(_ret);
+						}
+					};
+				} else if (typeof (self.inAnimation) === "object") {
+					var data = self.inAnimation;
+					var time = new Date().getTime() - data.startT;
+					if (time >= data.duration) {
+						self.map.x = data.targetX;
+						self.map.y = data.targetY;
+						self.inAnimation = false;
+					} else {
+						self.map.x = data.func(time, data.startX, data.diffX, data.duration);
+						self.map.y = data.func(time, data.startY, data.diffY, data.duration);
+					}
+
+					buildSuccess = function (_ret) {
+						if (time >= duration) {
+							self.inAnimation = !!self.allowPointerMove;
+						}
+						if (self.inAnimation) {
+							return self.animate();
+						}
+					}
+				}
+
+				// Build!
+				var p = window.reqAnimationFrame(self.build);
+				var buildError = function (e) {
+					console.log("Animation Error:", e);
+					if (buildSuccess !== null) {
+						return buildSuccess(false);
+					}
+				};
+				if (buildSuccess === null) {
+					p.catch(buildError);
+				} else {
+					p.then(buildSuccess, buildError);
+				}
+			});
+		};
+
+		// building
+		var loadedImages = {};
+		var isBuilding = false;
+		self.additionalMap = null;
+		self.isMapBroken = false;
+		self.build = function (_map, _additional) {
+			var mapId = _map === undefined ? self.mapId : (typeof (_map) !== "object" ? _map : null);
+			var map = typeof (_map) === "object" ? _map : null;
+			var additional = _additional === undefined ? false : _additional;
+			return new Promise(function (_resolve, _reject) {
+				if (isBuilding)
+					return _reject("is Building");
+				if (win.width === 0 || win.height === 0)
+					return _reject(new Error("0 size (" + win.width + "/" + win.height + ")"));
+
+				if (map === false && additional) {
+					self.additionalMap = null;
+				}
+
+				if (map === null) {
+					if (additional) {
+						if (mapId !== null && self.maps[mapId] !== undefined) {
+							self.additionalMap = map = self.maps[mapId];
+						}
+					} else {
+						// switch map
+						if (mapId !== null) {
+							mapId = !isNaN(mapId) && self.maps[mapId] === undefined && self.maps[parseInt(mapId)] !== undefined ? parseInt(mapId) : mapId;
+							if (self.maps[mapId] !== undefined) {
+								self.map = self.maps[mapId];
+								self.mapId = mapId;
+								self.POIListing();
+								self.mapIdSwitch.textContent = self.mapId;
+								storage.setItem(appName + "_map", self.mapId);
+							} else if (self.maps[map.mapId]) {
+								self.map = self.maps[map.mapId];
+							}
+
+						}
+						map = self.map;
+					}
+				}
+				// check map
+				if (map === null) {
+					return _reject(new Error("Unknown Map"));
+				}
+
+				if (!additional) {
+					c2d.clearRect(-win.width / 2, -win.height / 2, win.width, win.height);
+				}
+
+				// build map
+				map.x = map.x === undefined || Number.isNaN(map.x) ? 0 : map.x;
+				map.y = map.y === undefined || Number.isNaN(map.y) ? 0 : map.y;
+				map.factor = Math.pow(1 - self.config.scaleStep, map.scale === undefined ? 0 : map.scale);
+				map.lft = Math.round((map.x - win.width / 2 / map.factor) / self.config.size) - 1;
+				map.rgt = Math.round((map.x + win.width / 2 / map.factor) / self.config.size) + 1;
+				map.top = Math.round((map.y - win.height / 2 / map.factor) / self.config.size) - 1;
+				map.bot = Math.round((map.y + win.height / 2 / map.factor) / self.config.size) + 1;
+
+				var drawed = [];
+				var promises = [];
+				for (var y = map.top; y < map.bot; y++) {
+					for (var x = map.lft; x < map.rgt; x++) {
+						(function (x, y) {
+							var coord = x + "_" + y;
+							if (coord in map.tiles) {
+								var tile = map.tiles[coord];
+								drawed.push(tile.file);
+								promises.push(self.drawTile(map, tile, tile.file, self.shiftKey));
+							}
+						})(x, y);
+					}
+				}
+
+				Promise.all(promises)
+					.then(function () {
+						if (self.isMapBroken) {
+							self.validateMap();
+						}
+						c2d.strokeStyle = "white";
+						if (self.shiftKey) {
+							for (var x = map.lft; x <= map.rgt; x++) {
+								var cX = (-map.x + x * self.config.size - self.config.size / 2) * map.factor;
+								c2d.strokeStyle = "white";
+								c2d.beginPath();
+								c2d.moveTo(cX, -win.height / 2);
+								c2d.lineTo(cX, win.height / 2);
+								c2d.stroke();
+							}
+							for (var y = map.top; y <= map.bot; y++) {
+								var cY = (-map.y + y * self.config.size - self.config.size / 2) * map.factor;
+								c2d.strokeStyle = "white";
+								c2d.beginPath();
+								c2d.moveTo(-win.width / 2, cY);
+								c2d.lineTo(win.width / 2, cY);
+								c2d.stroke();
+							}
+						}
+
+						isBuilding = false;
+						if (self.additionalMap !== null) {
+							return self.build(self.additionalMap, true).then(_resolve, _reject);
+						} else {
+							return _resolve(true);
+						}
+					}, function (e) {
+						alertError(e);
+						isBuilding = false;
+						return _resolve(false);
+//						return _reject.call(self, e);
+					});
+
+				if (mapId !== null && self.maps[mapId] !== undefined) {
+					storage.setItem(appName + "_maps_" + mapId, JSON.stringify(self.maps[mapId]));
+				}
+
+				if (fs) {
+					for (var key in loadedImages) {
+						if (drawed.indexOf(key) === -1) {
+							delete loadedImages[key];
+						}
+					}
+				}
+
+//				if (!(sX < l || r < sX || sY < t || b < sY)) {
+//					c2d.strokeStyle = config.targetTileColor;
+//					c2d.beginPath();
+//					c2d.rect((cX + sX * size) * cScale, (cY + sY * size) * cScale, size * cScale, size * cScale);
+//					c2d.stroke();
+//				}
+
+			});
+		};
+//SELECT *  FROM `bestAdresse`
+//LEFT JOIN th_statistic ON bestAdresse.bsID = th_statistic.bsID
+//WHERE bestAdresse.`bsDate` LIKE '2015-03-09 %'
+		self.requestImage = function (_uri) {
+			if (fs) {
+				return fs
+					.getFile(_uri, false)
+					.then(function (File) {
+						return Promise.resolve(File.url);
+					}, function (e) {
+						return Promise.resolve(_uri, e);
+					});
+			} else {
+				return Promise.resolve(_uri);
+			}
+		};
+		self.loadImage = function (_file) {
+			var fileName = false, url = false, isObj = false;
+			switch (_file.constructor.name) {
+				case "File":
+					isObj = true;
+					url = URL.createObjectURL(_file);
+					break;
+				case "String":
+					url = self.config.imgPath + "/" + _file;
+					fileName = _file.replace(/^(.*\/)?(([^\/\.]+)\.([^\.]+))$/, "$2");
+					break;
+				default:
+					console.log("cant loadTile", _file.constructor.name, _file);
+			}
+
+			if (url === false)
+				Promise.reject(new Error("invalid type"));
+
+			if (loadedImages[fileName] !== undefined) {
+				var img = loadedImages[fileName];
+				if (!img) {
+//					return Promise.reject(new Error("Can't load Image!"));
+					self.isMapBroken = true;
+					delete(loadedImages[fileName]);
+				} else {
+					return Promise.resolve(img);
+				}
+			}
+
+			var img = new Image();
+			if (fileName !== false)
+				loadedImages[fileName] = img;
+
+			return new Promise(function (_resolve, _reject) {
+				var p = (!isObj) ? self.requestImage(url) : Promise.resolve(url);
+				p.then(function (_url) {
+					var onError = function (e) {
+						loadedImages[fileName] = false;
+						return _reject(new Error("Can't load Image!"));
+					};
+					img.addEventListener("error", onError);
+					var onLoad = function () {
+						if (img === undefined || !(img.naturalWidth !== 0 || img.width !== 0)) {
+							return onError();
+						}
+						return _resolve(img);
+					};
+					img.addEventListener("load", onLoad);
+
+					img.src = _url;
+					if (img.isLoaded()) {
+						onLoad();
+					}
+				}, _reject);
+			});
+		};
+
+		self.loadCanvas = function (_img) {
+			return new Promise(function (_resolve, _reject) {
+				var p;
+				switch (_img.constructor.name) {
+					case "File":
+					case "String":
+						p = self.loadImage(_img);
+						break;
+					case "HTMLImageElement":
+					case "Image":
+						p = Promise.resolve(_img);
+						break;
+					default:
+						console.log("unknown type", _img.constructor.name, _img);
+						_reject(new Error("unknown type"));
+				}
+				p.then(function (img) {
+					var canvas = document.createElement('canvas');
+					canvas.isLoaded = function () {
+						return true;
+					};
+					canvas.c2d = canvas.getContext('2d');
+					canvas.c2d.drawImage(img, 0, 0, canvas.width = img.width, canvas.height = img.height);
+					canvas.data = canvas.c2d.getImageData(0, 0, canvas.width, canvas.height).data;
+					return _resolve(canvas);
+				}, _reject);
+			});
+		};
+
+		self.drawTile = function (_map, _tile, _img, _drawCoords) {
+			var drawCoords = _drawCoords === undefined ? false : _drawCoords;
+			return new Promise(function (_resolve, _reject) {
+				var p;
+				switch (_img.constructor.name) {
+					case "HTMLCanvasElement":
+					case "HTMLImageElement":
+					case "Image":
+						p = Promise.resolve(_img);
+						break;
+					case "String":
+					case "File":
+						p = self.loadImage(_img);
+						break;
+					default:
+						console.log("cant drawTile", _img.constructor.name, _img);
+						p = Promise.reject(new Error("Unknown Type: " + _img.constructor.name));
+				}
+
+				p.then(function (_img) {
+					if (!_img.isLoaded() || (_img.naturalWidth === 0 && _img.width === 0))
+						return _resolve(false);
+					if (!(_map.lft <= _tile.posX && _tile.posX <= _map.rgt && _map.top <= _tile.posY && _tile.posY <= _map.bot))
+						return _resolve(false);
+
+
+					var x = (-_map.x + _tile.posX * _img.width - self.config.size / 2) * _map.factor;
+					var y = (-_map.y + _tile.posY * _img.height - self.config.size / 2) * _map.factor;
+
+					try {
+						c2d.drawImage(_img, 0, 0, _img.width, _img.height, x, y, _img.width * _map.factor, _img.height * _map.factor);
+					} catch (e) {
+						delete _map.tiles[_tile.posX + "_" + _tile.posY];
+						_reject.apply(self, arguments);
+					}
+
+					if (drawCoords) {
+						var opt = {font: Math.round(25 * _map.factor) + "px Arial", fillStyle: "white", textAlign: "center", textBaseline: "middle"};
+						c2d.drawText(_tile.posX + ", " + _tile.posY, x + _img.width * _map.factor / 2, y + _img.height * _map.factor / 2, undefined, opt);
+					}
+					return _resolve(true);
+				}, function () {
+					delete _map.tiles[_tile.posX + "_" + _tile.posY];
+					_reject.apply(self, arguments);
+				});
+			});
+		};
+
+//		self.getImageDataCmd = function (_file) {
+//			var file = _file !== undefined ? _file : false;
+//			return new Promise(function (_resolve, _reject) {
+//				self.loadImage(file)
+//					.then(function (_img) {
+//						if (_img !== undefined) {
+//							var canvas = document.createElement('canvas');
+//							canvas.c2d = canvas.getContext('2d');
+//							canvas.c2d.drawImage(_img, 0, 0, canvas.width = _img.width, canvas.height = _img.height);
+//							var data = canvas.c2d.getImageData(0, 0, _img.width, _img.height);
+//							return _resolve(data);
+//						}
+//					}, _reject);
+//			});
+//		};
+
+		/*
+		 * ******************* WAYPOINT MANAGEMENT *************************************************************************************************************************
+		 */
+
+		self.POIListing = function () {
+			if (self.map === undefined || !(self.map.waypoints instanceof Object)) {
+				self.map.waypoints = {};
+			}
+
+			if (self.map.waypoints.length === 0) {
+				self.POIList.style.display = "none";
+				return;
+			}
+			self.POIList.style.display = "";
+
+			var entrys = self.POIList.querySelectorAll("li");
+			entrys.forEach(function (_entry, _key, _array) {
+				if (_entry !== undefined && _entry.dataset !== undefined) {
+					var key = _entry.dataset.key;
+					if (self.map.waypoints[key] === undefined) {
+						_entry.remove();
+					}
+				}
+			});
+
+			self.map.waypoints.forEach(function (_item, _key, _object) {
+				if (_item === undefined) {
+					return;
+				}
+				var id = "POI-" + _key.replace(" ", "_");
+				var entry = self.POIList.querySelector("#" + id);
+				if (entry === null) {
+					entry = document.createElement("li");
+					entry.id = id;
+					entry.dataset.key = _key;
+					entry.dataset.x = _item.x;
+					entry.dataset.y = _item.y;
+					entry.textContent = _item.name;
+					entry.draggable = true;
+
+					entry.addEventListener("mousedown mouseup", stopPropagation);
+					entry.addEventListener("click", function (_e) {
+						self.POISelection(this, _e);
+						return stopPropagation(_e);
+					});
+					entry.addEventListener("dragstart", function (_e) {
+						_e.dataTransfer.setData("waypoint", this.dataset.key);
+					});
+					entry.addEventListener("dragend", function (_e) {
+						console.log("dragend", _e);
+					});
+					entry.addEventListener("drop", function (_e) {
+						console.log("drop", _e);
+					});
+
+					self.POIList.appendChild(entry);
+				}
+			});
+		};
+
+		self.POISelection = function (_target, _event) {
+			self.animate(parseInt(_target.dataset.x), parseInt(_target.dataset.y), self.shiftKey ? 0 : undefined);
+		};
+
+		self.POIAdd = function (target) {
+			// add Waypoint Object
+
+			var name = window.prompt("Create a Waypoint at " + self.map.mouseX + "," + self.map.mouseY + "?");
+			if (name === null && name === "") {
+				return false;
+			}
+
+			var key = name;
+			if (self.map.waypoints === undefined) {
+				self.map.waypoints = {};
+			}
+			if (self.map.waypoints[key] !== undefined) {
+				var override = window.confirm("Override Waypoint '" + name + "'");
+				if (!override) {
+					return false;
+				}
+			}
+
+			self.map.waypoints[key] = {
+				x: self.map.mouseX,
+				y: self.map.mouseY,
+				name: name
+			};
+			self.POISync();
+			self.POIListing();
+		};
+
+		self.POIRemove = function (key) {
+			if (self.map.waypoints[key] !== undefined) {
+				delete(self.map.waypoints[key]);
+			}
+			self.POISync();
+			self.POIListing();
+		};
+
+		self.POISync = function () {
+
+		};
+
+		/*
+		 * ******************* INSTALL & INITALIZE *************************************************************************************************************************
+		 */
+
+		/*
+		 * INSTALL CONTENT
+		 */
+
+		self.innerHTML = "";
+		var root = self.createShadowRoot();
+		var sc = new ScriptPath();
+		var template = sc.document.querySelector('template.PY-MapViewerTemplate');
+		var instance = document.importNode(template.content, true);
+		root.appendChild(instance);
+		var canvas = root.querySelector('canvas#PY-MapViewerCanvas');
+		var c2d = canvas.getContext('2d');
+
+		self.status = root.querySelector("#PY-Status");
+		self.compareStatus = root.querySelector("#PY-CompareStatus");
+		self.compareStatus.style.display = "none;"
+
+		self.POIList = root.querySelector("#PY-POIList");
+		self.POIList.style.display = "none;"
+		self.POIList.dropable = true;
+
+
+		self.mapIdSwitch = root.querySelector("#PY-MapIdSwitch");
+		self.mapIdSwitchOCE = new OneClickEdit(self.mapIdSwitch, {
+			options: function () {
+				return	Object.keys(self.maps);
+			},
+			success: function (value) {
+				if (self.mapId !== value) {
+					self.build(value).catch(alertError);
+				}
+			}
+		}, root);
+
+		var contextMenu = self.contextMenu = new PopupMenu();
+		//contextMenu.setSize(140, 0);
+		contextMenu.bind(canvas);
+//		contextMenu.addSeparator();
+		contextMenu.add('Add POI', function () {
+			self.POIAdd.apply(self, arguments);
+		});
+//		contextMenu.addSeparator();
+//		contextMenu.add('close', function(target) {
+//			window.close();
+//		});
+
+
+		/*
+		 * LOAD STORAGE
+		 */
+		var tmp = storage.getItem(appName + "_maps");
+		if (tmp !== null) {
+			(Array.isArray(tmp = JSON.parse(tmp)) ? tmp : [])
+				.forEach(function (n) {
+					var json = storage.getItem(appName + "_maps_" + n);
+					if (json !== null) {
+						self.maps[n] = JSON.parse(json);
+					}
+				});
+			tmp = storage.getItem(appName + "_map");
+			if (self.mapId === null) {
+				self.mapId = tmp !== null ? tmp : Object.keys(self.maps)[0];
+			}
+			self.mapIdSwitch.textContent = self.mapId;
+		}
+		tmp = undefined;
+		/*
+		 * WORKER
+		 */
+		self.worker = false;
+		self.worker = new WorkerController("MapViewerWorker.js", false);
+		if (self.worker) {
+			self.worker
+				.registerCommand(function (data, message) {
+					console.log(message.id, message.command, data);
+				})
+				.registerCommand("getImageData", self.getImageDataCmd)
+				.post("set", self.config);
+		}
+
+		// WINDOW
+		window.addEventListener("resize", self.onResize, false);
+		window.addEventListener("hashchange", self.onHashChange, false);
+		// KEYBOARD
+		window.addEventListener("keydown", self.onKeyDown, true);
+		window.addEventListener("keyup", self.onKeyUp, true);
+		// MOUSE
+		canvas.addEventListener("mousemove", self.onMouseMove, true);
+		canvas.addEventListener("mousedown", self.onMouseDown, true);
+		window.addEventListener("mouseup", self.onMouseUp, true);
+		canvas.addEventListener("mouseover", self.onMouseOver, true);
+		canvas.addEventListener("mouseout", self.onMouseOut, true);
+		self.addEventListener("mousewheel", self.onMouseWheel, true);
+		// TOUCH
+		window.addEventListener("touchend", self.onTouchEnd, true);
+		canvas.addEventListener("touchmove", self.onTouchMove, true);
+		canvas.addEventListener("touchstart", self.onTouchStart, true);
+		// DRAG & DROP
+		canvas.draggable = true;
+		canvas.addEventListener("dragenter", stopPropagation, true);
+		canvas.addEventListener("dragover", self.onDragOver, true);
+		canvas.addEventListener("dragleave", self.onMouseDown, true);
+		canvas.addEventListener("drop", self.onDrop, true);
+
+		fs.queryUsageAndQuota().catch(alertError);
+		window.reqAnimationFrame(function () {
+			return self.validateMap();
+		}, alertError)
+			.then(function () {
+				if (Object.keys(self.maps).length > 0) {
+					self.mapId = self.mapId === null ? Object.keys(self.maps)[0] : self.mapId;
+					self.mapIdSwitch.textContent = self.mapId;
+				}
+				return Promise.resolve();
+			}, alertError)
+			.then(function () {
+				return window.reqAnimationFrame(self.onResize);
+			}, alertError)
+			.then(function () {
+				return window.reqAnimationFrame(self.onHashChange);
+			}, alertError)
+			.then(function () {
+				return window.reqAnimationFrame(self.animate);
+			}, alertError)
+			.catch(alertError);
+	};
+
+	var PYMapViewerPrototype = Object.create(HTMLElement.prototype, {
+		createdCallback: {
+			value: PYMapViewerClass
+		}
+	});
+	var PYMapViewer = document.registerElement('PY-MapViewer', {
+		prototype: PYMapViewerPrototype
+	});
+
+</script>

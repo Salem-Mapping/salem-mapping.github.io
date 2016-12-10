@@ -1,0 +1,38 @@
+<script>
+	
+	function *tileGen(_x0, _y0) {
+		var coords, match, i = 0, ret = false;
+		var x0 = _x0 !== undefined ? _x0 : 0;
+		var y0 = _y0 !== undefined ? _y0 : 0;
+		coords = x0 + "_" + y0;
+		yield (coords);
+		do {
+			i++;
+			match = false;
+			for (var d = 0; d < 4; d++) {
+				for (var r = 1 - i; r <= i; r++) {
+					switch (d) {
+						case 0:
+							coords = [(x0 + r), (y0 - i)];
+							break;
+						case 1:
+							coords = [(x0 + i), (y0 + r)];
+							break;
+						case 2:
+							coords = [(x0 - r), (y0 + i)];
+							break;
+						case 3:
+							coords = [(x0 - i), (y0 - r)];
+							break;
+						default:
+							coords = false;
+					}
+					ret = yield(coords);
+					match = match || ret;
+				}
+			}
+		} while (match);
+		return true;
+	}
+	
+</script>

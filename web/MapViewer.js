@@ -2,17 +2,27 @@
  * Map Viewer
  *	Optimiert für Salem
  *	
- * @param {type} _config
+ * @param {type} _input
  * @param {type} _init
  * @returns {undefined}
  */
-function MapViewer(_config, _init) {
-	var __MapViewer = this;
+function MapViewer(_input, _init) {
+	/*
+	 * SET INPUT VALUES
+	 */
+	var _MV = this;
 	var $win = typeof (window) === "undefined" ? false : $(window);
-	var config = __MapViewer.config = _config;
-	var init = __MapViewer.init = $win === false ? false : _init === undefined ? true : _init;
+	var config = _MV.config = _input;
+	var init = _MV.init = $win === false ? false : _init === undefined ? true : _init;
+	var size = config.size;
+	var appName = config.appName;
+
+	/*
+	 * ZERO VALUES
+	 */
+	var storage = false;
+	var slider = false, center = false, progress = false;
 	var canvas = config.canvas, c2d = false;
-	var fileSystem = false;
 	var mapFolder = false;
 	var winW = 0, winH = 0, cX = 0, cY = 0, sX = 0, sY = 0;
 	var imgs = {}, currentMap = {};
@@ -25,83 +35,23 @@ function MapViewer(_config, _init) {
 		cX: 0,
 		cY: 0
 	};
-	var appName = config.appName;
+
+	/*
+	 * INIT
+	 */
+	var storage = localStorage;
 	if ($win) {
-		var slider = config.touch ? false : $(".slider").slider({
+		slider = config.touch ? false : $(".slider").slider({
 			orientation: "vertical",
 			min: -10,
 			max: 15
 		});
-		var center = $(".centerBarInner");
+		center = $(".centerBarInner");
 		c2d = canvas[0].getContext('2d');
-		var storage = window.localStorage;
 	}
-	var size = config.size;
+	_MV.fileSystem = new FileSystem(PERSISTENT, ((q = storage.getItem(appName + '_quota')) === null ? config.defaultQuota : parseInt(q)));
 	// init local file System
 
-	var fsError = function (e) {
-		console.log("fsError", e);
-		var msg = '';
-		switch (e.code) {
-			case FileError.QUOTA_EXCEEDED_ERR:
-				msg = 'QUOTA_EXCEEDED_ERR';
-				break;
-			case FileError.NOT_FOUND_ERR:
-				msg = 'NOT_FOUND_ERR';
-				break;
-			case FileError.SECURITY_ERR:
-				msg = 'SECURITY_ERR';
-				break;
-			case FileError.INVALID_MODIFICATION_ERR:
-				msg = 'INVALID_MODIFICATION_ERR';
-				break;
-			case FileError.INVALID_STATE_ERR:
-				msg = 'INVALID_STATE_ERR';
-				break;
-			default:
-				msg = 'Unknown Error: ' + e.code;
-		}
-		;
-		console.log('Error: ' + msg);
-	};
-	var currentlyGrantedBytes = 0;
-	var initFileSystem = function (askQuota, optionalCallback) {
-		if (navigator.persistentStorage && askQuota > currentlyGrantedBytes) {
-			console.log("requestQuota: ", askQuota);
-			navigator.persistentStorage.queryUsageAndQuota(function (remainigBytes, grantedBytes) {
-				var usedBytes = grantedBytes - remainigBytes;
-				console.log("currently granted Bytes:", grantedBytes);
-				console.log("currently used Bytes:", usedBytes);
-				console.log("currently remainig Bytes:", remainigBytes);
-				var initFileSystemCore = function (bytes) {
-					window.requestFileSystem(PERSISTENT, bytes, function (fs) {
-						console.log("requestFileSystem: success", fs);
-						storage.setItem(appName + '_quota', bytes);
-						fileSystem = fs;
-						fileSystem.root.getDirectory(config.appName, {
-							create: true
-						}, function (dirEntry) {
-							console.log("getDirectory: success", dirEntry);
-							mapFolder = dirEntry;
-							if (optionalCallback !== undefined) {
-								optionalCallback(fs, dirEntry);
-							}
-
-						}, fsError);
-					}, fsError);
-				};
-				if (remainigBytes < askQuota) {
-					console.log("request Bytes:", usedBytes + askQuota);
-					navigator.persistentStorage.requestQuota(usedBytes + askQuota, function (grantedBytes) {
-						console.log("now granted Bytes:", grantedBytes);
-						initFileSystemCore(grantedBytes);
-					}, fsError);
-				} else {
-					initFileSystemCore(grantedBytes);
-				}
-			}, fsError);
-		}
-	};
 	// Background Process
 	/*
 	 * / if (Worker) { var worker = new SharedWorker('worker.js'); worker.port.addEventListener('message', function(e) { var data = e.data; var cmd = !data.cmd ? '---' : data.cmd; switch (data.cmd) {
@@ -110,7 +60,7 @@ function MapViewer(_config, _init) {
 	 * case "---": default: console.log('Worker said: ', e.data); } }, false); worker.port.start(); } //
 	 */
 
-	isChangeHash = false;
+	var isChangeHash = false;
 	// calculate
 	var calcPos = function (refreshHash) {
 		d.t = Math.round(((-winH / 2) / cScale - cY) / size) - 1;
@@ -167,8 +117,8 @@ function MapViewer(_config, _init) {
 
 		currentMap = newMap !== undefined ? newMap : currentMap;
 		c2d.clearRect(-winW / 2, -winH / 2, winW, winH);
-		for (y = d.t; y < d.b; y++) {
-			for (x = d.l; x < d.r; x++) {
+		for (var y = d.t; y < d.b; y++) {
+			for (var x = d.l; x < d.r; x++) {
 
 				var key = x + "_" + y;
 				if (key in currentMap) {
@@ -213,8 +163,8 @@ function MapViewer(_config, _init) {
 		isBuilding = false;
 	};
 	var loadImage = function (url, options) {
-		img = new Image();
-		jQuery.extend(img, options);
+		var img = new Image();
+		$.extend(img, options);
 		img.onload = imgLoaded;
 		img.src = url;
 		imgs[options.posX + "_" + options.posY] = img;
@@ -263,64 +213,67 @@ function MapViewer(_config, _init) {
 
 	// reload
 	var reload = function () {
-		center.append('<div class="progress" />');
-		var p = $(".progress").css({
-			width: 400
-		}).progressbar({
-			value: false
-		});
+		if ($win) {
+			center.append('<div class="progress" />');
+			progress = $(".progress").css({
+				width: 400
+			}).progressbar({
+				value: false
+			});
+		}
 
-		var storedJSON = storage.getItem("maps");
+		var storedJSON = storage.getItem(appName + '_maps');
 		var storedData = storedJSON === null ? null : JSON.parse(storedJSON);
-
-		var startFileSystem = function (data, textStatus, jqXHR) {
-			var askQuota = data.maxsize !== undefined ? data.maxsize : ((q = storage.getItem(appName + '_quota')) === null ? config.defaultQuota : q);
-			initFileSystem(askQuota, function () {
-				build(data.maps[0]);
-				p.remove();
+		var processMaps = function (data, textStatus, jqXHR) {
+			var askQuota = data.maxsize !== undefined ? data.maxsize : ((q = storage.getItem(appName + '_quota')) === null ? config.defaultQuota : parseInt(q));
+			storage.setItem(appName + '_quota', askQuota);
+			_MV.fileSystem.requestQuota(askQuota).then(function (_fileSystem, _grantedBytes) {
+				_fileSystem.getDirectory("/" + config.appName).then(function (_fileSystem, _directory) {
+					mapFolder = _directory;
+					build(data.maps[0]);
+					progress.remove();
+				});
 			});
 		};
 		var loadFromLive = function (data, textStatus, jqXHR) {
-			if (jqXHR.status == 200) {
-				data.modified = jqXHR.getResponseHeader('Date');
-				storage.setItem("maps", JSON.stringify(data));
-				startFileSystem(data, textStatus, jqXHR);
-			}
-			else if (storedData !== null && storedData !== false) {
-				startFileSystem(storedData, textStatus, jqXHR);
+			switch (jqXHR.status) {
+				case 200:
+					data.modified = jqXHR.getResponseHeader('Date');
+					storage.setItem(appName + '_maps', JSON.stringify(data));
+					processMaps(data, textStatus, jqXHR);
+					break;
+
+				default :
+					if (storedData !== null && storedData !== false) {
+						processMaps(storedData, textStatus, jqXHR);
+					}
 			}
 		};
 		var loadFromCache = function (jqXHR, textStatus, errorThrown) {
 			console.log("errorThrown", errorThrown);
 			if (storedData !== null && storedData !== false) {
-				startFileSystem(storedData, textStatus, jqXHR);
+				processMaps(storedData, textStatus, jqXHR);
 			}
 		};
 
+		var headers = {};
+		if (storedData !== null)
+			headers["If-Modified-Since"] = storedData.modified;
 		$.ajax({dataType: "json",
 			url: location.href,
 			ifModified: true,
-			headers: {
-				"If-Modified-Since": storedData.modified
-			},
+			headers: headers,
 			data: {
 				a: 'load'
 			}
 		}).then(loadFromLive, loadFromCache);
-
 	};
 
 	var saveImage = function (img) {
-		var cvs = document.createElement('canvas');
-		cvs.setAttribute('width', img.width);
-		cvs.setAttribute('height', img.height);
-		cvs.getContext('2d').drawImage(img, 0, 0, img.width, img.height, 0, 0, img.width, img.height);
-		var dataURL = cvs.toDataURL();
-		var blob = dataURItoBlob(dataURL);
 		if (mapFolder) {
 			mapFolder.getFile(
-					img.file,
-					{create: true},
+				img.file,
+				{create: true},
 			function (fileEntry) {
 				fileEntry.createWriter(function (writer) {
 					writer.onwriteend = function (e) {
@@ -329,7 +282,11 @@ function MapViewer(_config, _init) {
 					writer.onerror = function (e) {
 						console.log("Write error: ", fileEntry.fullPath, e);
 					};
-					writer.write(blob);
+					var cvs = document.createElement('canvas');
+					cvs.setAttribute('width', img.width);
+					cvs.setAttribute('height', img.height);
+					cvs.getContext('2d').drawImage(img, 0, 0, img.width, img.height, 0, 0, img.width, img.height);
+					writer.write(dataURItoBlob(cvs.toDataURL()));
 				});
 			}, fsError);
 		}
@@ -458,16 +415,16 @@ function MapViewer(_config, _init) {
 		var keyPress = true;
 		var kX = 0, kY = 0, factor = config.keyMovementFactor;
 		$win.keydown(
-				function (e) {
-					keyPress = (kd[e.keyCode] === undefined);
-					kd[e.keyCode] = (new Date).getMicrotime();
-					cY = cY + (kY = e.keyCode === 38 ? 1 : e.keyCode === 40 ? -1 : 0) * (e.shiftKey ? 1 : factor);
-					cX = cX + (kX = e.keyCode === 37 ? 1 : e.keyCode === 39 ? -1 : 0) * (e.shiftKey ? 1 : factor);
-					if (!allowPointerMove && kX + kY !== 0) {
-						calcPos(true);
-						build();
-					}
-				});
+			function (e) {
+				keyPress = (kd[e.keyCode] === undefined);
+				kd[e.keyCode] = (new Date).getMicrotime();
+				cY = cY + (kY = e.keyCode === 38 ? 1 : e.keyCode === 40 ? -1 : 0) * (e.shiftKey ? 1 : factor);
+				cX = cX + (kX = e.keyCode === 37 ? 1 : e.keyCode === 39 ? -1 : 0) * (e.shiftKey ? 1 : factor);
+				if (!allowPointerMove && kX + kY !== 0) {
+					calcPos(true);
+					build();
+				}
+			});
 		$win.keyup(function (e) {
 			var delta = 0;
 			switch (e.keyCode) {
@@ -716,4 +673,5 @@ function MapViewer(_config, _init) {
 			}
 		});
 	}
+
 }

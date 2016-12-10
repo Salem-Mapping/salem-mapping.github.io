@@ -1,0 +1,423 @@
+
+//<script type="text/javascript">
+	'use strict';
+
+	/*
+	 * OBJECT
+	 */
+	if (this.Object !== undefined) {
+		if (this.Object.prototype.merge === undefined) {
+			this.Object.defineProperty(this.Object.prototype, "merge", {
+				enumerable: false,
+				writable: true,
+				value: function () {
+					var self = this;
+					[].forEach.call(arguments, function (_obj) {
+						switch (true) {
+							case Array.isArray(_obj):
+								if (Array.isArray(this)) {
+									self.concat(_obj);
+								} else {
+									_obj.forEach(function (value, key) {
+										if (typeof (value) === "object" && typeof (self[key]) === "object" && value.constructor.name === self[key].constructor.name) {
+											self[key].merge(value);
+										} else {
+											self[key] = value;
+										}
+									});
+								}
+								break;
+
+							case typeof (_obj) === "object":
+								for (var key in _obj) {
+									if (typeof (_obj[key]) === "object" && typeof (self[key]) === "object") {
+										self[key].merge(_obj[key]);
+									} else {
+										self[key] = _obj[key];
+									}
+								}
+								break;
+
+							default:
+						}
+						return this;
+					});
+				}
+			});
+		}
+
+		if (this.Object.prototype.length === undefined) {
+			this.Object.defineProperty(this.Object.prototype, "length", {
+				enumerable: false,
+				get: function () {
+					var i = 0;
+					for (var attr in this) {
+						i++;
+					}
+					return i;
+				}
+			});
+		}
+
+		if (this.Object.prototype.forEach === undefined) {
+			this.Object.defineProperty(this.Object.prototype, "forEach", {
+				enumerable: false,
+				writable: true,
+				value: function (_callback) {
+					if (this == null) {
+						throw new TypeError(' this is null or not defined');
+					}
+					if (typeof _callback !== "function") {
+						throw new TypeError(_callback + ' is not a function');
+					}
+					for (var attr in this) {
+						if (_callback(this[attr], attr, this) === false) {
+							break;
+						}
+					}
+				}
+			});
+		}
+	}
+
+	/*
+	 * MATH
+	 */
+
+	if (this.Math !== undefined) {
+		// simple linear tweening - no easing, no acceleration
+		if (this.Math.linearTween === undefined) {
+			this.Math.linearTween = function (t, b, c, d) {
+				return c * t / d + b;
+			};
+		}
+
+		// quadratic easing in - accelerating from zero velocity
+		if (this.Math.easeInQuad === undefined) {
+			this.Math.easeInQuad = function (t, b, c, d) {
+				t /= d;
+				return c * t * t + b;
+			};
+		}
+
+		// quadratic easing out - decelerating to zero velocity
+		if (this.Math.easeOutQuad === undefined) {
+			this.Math.easeOutQuad = function (t, b, c, d) {
+				t /= d;
+				return -c * t * (t - 2) + b;
+			};
+		}
+
+		// quadratic easing in/out - acceleration until halfway, then deceleration
+		if (this.Math.easeInOutQuad === undefined) {
+			this.Math.easeInOutQuad = function (t, b, c, d) {
+				t /= d / 2;
+				if (t < 1) return c / 2 * t * t + b;
+				t--;
+				return -c / 2 * (t * (t - 2) - 1) + b;
+			};
+		}
+		// cubic easing in - accelerating from zero velocity
+		if (this.Math.easeInCubic === undefined) {
+			this.Math.easeInCubic = function (t, b, c, d) {
+				t /= d;
+				return c * t * t * t + b;
+			};
+		}
+
+		// cubic easing out - decelerating to zero velocity
+		if (this.Math.easeOutCubic === undefined) {
+			this.Math.easeOutCubic = function (t, b, c, d) {
+				t /= d;
+				t--;
+				return c * (t * t * t + 1) + b;
+			};
+		}
+
+		// cubic easing in/out - acceleration until halfway, then deceleration
+		if (this.Math.easeInOutCubic === undefined) {
+			this.Math.easeInOutCubic = function (t, b, c, d) {
+				t /= d / 2;
+				if (t < 1) return c / 2 * t * t * t + b;
+				t -= 2;
+				return c / 2 * (t * t * t + 2) + b;
+			};
+		}
+
+		// quartic easing in - accelerating from zero velocity
+		if (this.Math.easeInQuart === undefined) {
+			this.Math.easeInQuart = function (t, b, c, d) {
+				t /= d;
+				return c * t * t * t * t + b;
+			};
+		}
+
+		// quartic easing out - decelerating to zero velocity
+		if (this.Math.easeOutQuart === undefined) {
+			this.Math.easeOutQuart = function (t, b, c, d) {
+				t /= d;
+				t--;
+				return -c * (t * t * t * t - 1) + b;
+			};
+		}
+
+		// quartic easing in/out - acceleration until halfway, then deceleration
+		if (this.Math.easeInOutQuart === undefined) {
+			this.Math.easeInOutQuart = function (t, b, c, d) {
+				t /= d / 2;
+				if (t < 1) return c / 2 * t * t * t * t + b;
+				t -= 2;
+				return -c / 2 * (t * t * t * t - 2) + b;
+			};
+		}
+
+		// quintic easing in - accelerating from zero velocity
+		if (this.Math.easeInQuint === undefined) {
+			this.Math.easeInQuint = function (t, b, c, d) {
+				t /= d;
+				return c * t * t * t * t * t + b;
+			};
+		}
+
+		// quintic easing out - decelerating to zero velocity
+		if (this.Math.easeOutQuint === undefined) {
+			this.Math.easeOutQuint = function (t, b, c, d) {
+				t /= d;
+				t--;
+				return c * (t * t * t * t * t + 1) + b;
+			};
+		}
+
+		// quintic easing in/out - acceleration until halfway, then deceleration
+		if (this.Math.easeInOutQuint === undefined) {
+			this.Math.easeInOutQuint = function (t, b, c, d) {
+				t /= d / 2;
+				if (t < 1) return c / 2 * t * t * t * t * t + b;
+				t -= 2;
+				return c / 2 * (t * t * t * t * t + 2) + b;
+			};
+		}
+
+		// sinusoidal easing in - accelerating from zero velocity
+		if (this.Math.easeInSine === undefined) {
+			this.Math.easeInSine = function (t, b, c, d) {
+				return -c * Math.cos(t / d * (Math.PI / 2)) + c + b;
+			};
+		}
+
+		// sinusoidal easing out - decelerating to zero velocity
+		if (this.Math.easeOutSine === undefined) {
+			this.Math.easeOutSine = function (t, b, c, d) {
+				return c * Math.sin(t / d * (Math.PI / 2)) + b;
+			};
+		}
+
+		// sinusoidal easing in/out - accelerating until halfway, then decelerating
+		if (this.Math.easeInOutSine === undefined) {
+			this.Math.easeInOutSine = function (t, b, c, d) {
+				return -c / 2 * (Math.cos(Math.PI * t / d) - 1) + b;
+			};
+		}
+
+		// exponential easing in - accelerating from zero velocity
+		if (this.Math.easeInExpo === undefined) {
+			this.Math.easeInExpo = function (t, b, c, d) {
+				return c * Math.pow(2, 10 * (t / d - 1)) + b;
+			};
+		}
+
+		// exponential easing out - decelerating to zero velocity
+		if (this.Math.easeOutExpo === undefined) {
+			this.Math.easeOutExpo = function (t, b, c, d) {
+				return c * (-Math.pow(2, -10 * t / d) + 1) + b;
+			};
+		}
+
+		// exponential easing in/out - accelerating until halfway, then decelerating
+		if (this.Math.easeInOutExpo === undefined) {
+			this.Math.easeInOutExpo = function (t, b, c, d) {
+				t /= d / 2;
+				if (t < 1) return c / 2 * Math.pow(2, 10 * (t - 1)) + b;
+				t--;
+				return c / 2 * (-Math.pow(2, -10 * t) + 2) + b;
+			};
+		}
+
+		// circular easing in - accelerating from zero velocity
+		if (this.Math.easeInCirc === undefined) {
+			this.Math.easeInCirc = function (t, b, c, d) {
+				t /= d;
+				return -c * (Math.sqrt(1 - t * t) - 1) + b;
+			};
+		}
+
+		// circular easing out - decelerating to zero velocity
+		if (this.Math.easeOutCirc === undefined) {
+			this.Math.easeOutCirc = function (t, b, c, d) {
+				t /= d;
+				t--;
+				return c * Math.sqrt(1 - t * t) + b;
+			};
+		}
+
+		// circular easing in/out - acceleration until halfway, then deceleration
+		if (this.Math.easeInOutCirc === undefined) {
+			this.Math.easeInOutCirc = function (t, b, c, d) {
+				t /= d / 2;
+				if (t < 1) return -c / 2 * (Math.sqrt(1 - t * t) - 1) + b;
+				t -= 2;
+				return c / 2 * (Math.sqrt(1 - t * t) + 1) + b;
+			};
+		}
+	}
+
+	/*
+	 * ARRAY
+	 */
+	if (this.Array !== undefined && this.Array.prototype.getRandom === undefined) {
+		this.Object.defineProperty(this.Array.prototype, "getRandom", {
+			enumerable: false,
+			writable: true,
+			value: function () {
+				return this[Math.floor(Math.random() * this.length)];
+			}
+		});
+	}
+
+
+	/*
+	 *  CONTEXT
+	 */
+	(function () {
+		var context = this;
+		this.requestAnimationFrame = this.requestAnimationFrame || this.webkitRequestAnimationFrame || this.mozRequestAnimationFrame || this.oRequestAnimationFrame
+			|| this.msRequestAnimationFrame
+			|| function (callback) {
+				this.setTimeout(callback, 1000 / 60);
+			};
+
+		this.reqAnimationFrame = function (_callback, _args) {
+			var object = this;
+			return new Promise(function (_resolve, _reject) {
+				var id = context.requestAnimationFrame(function () {
+					try {
+						return _resolve(_callback.apply(object, _args));
+					} catch (e) {
+						return _reject.apply(object, [e]);
+					}
+				});
+				return id;
+			});
+		};
+	}).call(this);
+
+	/*
+	 * DATE
+	 */
+	if (this.Date !== undefined) {
+	}
+
+	/*
+	 * IMAGE
+	 */
+	if (this.Image !== undefined) {
+		if (this.Image.prototype.isLoaded === undefined) {
+			this.Image.prototype.isLoaded = this.Image.prototype.isLoaded || function () {
+				return  this.complete || !(typeof this.naturalWidth !== "undefined" && this.naturalWidth === 0);
+			};
+		}
+	}
+
+	/*
+	 * NODE
+	 */
+
+	if (this.Node !== undefined) {
+		if (this.Node.prototype.setAttributes === undefined) {
+			this.Node.prototype.setAttributes = function (_attrs) {
+				for (var idx in _attrs) {
+					if (idx === 'styles' || idx === 'style') {
+						this.style.setProperties(_attrs[idx]);
+					} else if (idx === 'html') {
+						this.innerHTML = _attrs[idx];
+					} else {
+						this.setAttribute(idx, _attrs[idx]);
+					}
+				}
+			};
+		}
+
+		if (this.Node.prototype.insertAfterThis === undefined) {
+			this.Node.prototype.insertAfterThis = function (_newNode) {
+				if (!_newNode instanceof Node) {
+					throw new TypeError('arguments[1] is not a Node');
+				}
+				if (this.nextSibling === null) {
+					this.parentNode.appendChild(_newNode);
+				} else {
+					this.parentNode.insertBefore(_newNode, this.nextSibling);
+				}
+			}
+		}
+	}
+
+	/*
+	 * NODE LIST
+	 */
+
+	if (this.NodeList !== undefined) {
+
+	}
+
+	/*
+	 * CSS
+	 */
+
+	if (this.CSSStyleDeclaration !== undefined && this.CSSStyleDeclaration.prototype.setProperties === undefined) {
+		this.CSSStyleDeclaration.prototype.setProperties = function (_css) {
+			if (typeof (_css) !== "object") {
+				return false;
+			}
+			for (var prop in _css) {
+				this.setProperty(prop, _css[prop]);
+			}
+			return true;
+		}
+	}
+
+
+	/*
+	 * CANVAS
+	 */
+	if (this.CanvasRenderingContext2D !== undefined) {
+		if (this.CanvasRenderingContext2D.prototype.drawText === undefined) {
+			this.CanvasRenderingContext2D.prototype.drawText = function (_text, _x, _y, _maxWidth, _opt) {
+				var opt = {
+					font: "10px sans-serif",
+					fillStyle: "black",
+					textAlign: "start",
+					textBaseline: "alphabetic",
+					direction: "inherit"
+				};
+				var text = _text === undefined ? "" : _text;
+				var x = _x === undefined ? 0 : _x;
+				var y = _y === undefined ? 0 : _y;
+				if (_opt instanceof Object) {
+					for (var a in opt) {
+						if (_opt[a] !== undefined)
+							opt[a] = _opt[a];
+					}
+				}
+				for (var a in opt) {
+					this[a] = opt[a];
+				}
+				if (_maxWidth !== undefined) {
+					this.fillText(text, x, y, _maxWidth);
+				} else {
+					this.fillText(text, x, y);
+				}
+			};
+		}
+	}
+
+//</script>
