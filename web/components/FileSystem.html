@@ -93,7 +93,7 @@
 						self.usedBytes = _usedBytes;
 						self.remainigBytes = _grantedBytes - _usedBytes;
 						if (self.debug)
-							console.log("currently granted:", FileSystem.format(self.grantedBytes), "used:", FileSystem.format(self.usedBytes), "remainig:", FileSystem.format(self.remainigBytes));
+							console.log("currently granted:", FileSystem.format(self.grantedBytes), "used:", FileSystem.format(self.usedBytes), "remainig:", self.remainigBytes !== null ? FileSystem.format(self.remainigBytes) : 'null');
 						_resolve(self, self.usedBytes, self.grantedBytes, self.remainigBytes);
 					};
 					var failture = function (e) {

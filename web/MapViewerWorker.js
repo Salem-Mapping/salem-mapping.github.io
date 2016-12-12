@@ -68,10 +68,14 @@ importScripts("components/Color.html");
 									return XHR.get(filepath, {responseType: 'arraybuffer'})
 										.then(function (_data) {
 											return _fileObj.write(new Blob([_data], {type: "image/png"}));
-										}, _reject)
+										}, (e) => {
+											_reject(e);
+										})
 										.then(function (e) {
 											return Promise.resolve(_fileObj);
-										}, _reject);
+										}, (e) => {
+											_reject(e);
+										});
 								}, function (e) {
 									if (e instanceof Error) {
 										console.log(e.stack);
@@ -88,7 +92,9 @@ importScripts("components/Color.html");
 //									fileData[fileName] = data;
 //									return Promise.resolve(true);
 //								});
-								}, _reject);
+								}, (e) => {
+									_reject(e);
+								});
 							requests.push(p);
 						})(c);
 					}

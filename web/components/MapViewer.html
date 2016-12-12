@@ -193,14 +193,14 @@
 		var storage = localStorage;
 		var fs = false;
 		if (typeof (FileSystem) !== "undefined") {
-			fs = new FileSystem(PERSISTENT);
+			fs = new FileSystem(PERSISTENT, undefined, true);
 		}
 		// zero values
 		var win = self.getBoundingClientRect();
 		self.maps = {};
 		self.mapId = null;
 		self.map = null;
-		var logMouse = false;
+		var logMouse = true;
 		//		var build = undefined;
 		//		var slider = false, center = false, progress = false;
 		//		var canvas = conf.canvas, c2d = false;
@@ -327,6 +327,7 @@
 		// START
 		self.onMouseDown = function (e) {
 			if (logMouse) console.log("onMouseDown");
+			self.mouseDown = (new Date()).getTime();
 			stopPropagation(e);
 			self.pointers.importMouse(e, true).clearDiff();
 			switch (e.button) {
@@ -378,7 +379,8 @@
 			}
 		};
 		self.onMouseUp = function (e) {
-			if (logMouse) console.log("onMouseUp");
+			let time = (new Date()).getTime() - self.mouseDown;
+			if (logMouse) console.log("onMouseUp", time);
 			self.pointers.importMouse(e);
 			switch (e.button) {
 				default:
@@ -605,7 +607,7 @@
 //											var t = (new Date).getTime();
 											compareImageData(canvas.data, tile.data)
 												.then(function (match) {
-//													console.log("checkNextTile", c, tile.coords);
+													console.log("checkNextTile", c, tile.coords);
 													if (match <= 5) {
 														var diff = {x: n.value[0] - tile.posX, y: n.value[1] - tile.posY};
 														console.log("checkNextTile", diff, c, tile.coords, match);
@@ -639,7 +641,7 @@
 					}
 
 					var searchTime = (new Date).getTime();
-					console.log("start search");
+					console.log("start search", self.shiftKey);
 					var p;
 					if (self.shiftKey) {
 						p = Promise.resolve(false);
