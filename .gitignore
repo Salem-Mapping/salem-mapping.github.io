@@ -1,3 +1,4 @@
 nbproject
 lib
 */lib
+!lib/php-curl-class
