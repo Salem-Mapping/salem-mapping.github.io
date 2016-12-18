@@ -807,7 +807,7 @@
 				if (lastMod !== null) {
 //					opt.header["If-Modified-Since"] = new Date(parseInt(lastMod) * 1000).toUTCString();
 				}
-				XHR.getJSON("?a=load", opt)
+				XHR.getJSON("maps.json", opt)
 					.then(function (_data) {
 						if (_data === null) {
 							return _resolve(_data);
