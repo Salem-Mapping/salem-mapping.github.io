@@ -1,9 +1,9 @@
 'use strict';
-importScripts("components/ExtendedAPI.html");
-importScripts("components/WorkerController.html");
-importScripts("components/XHR.html");
-importScripts("components/FileSystem.html");
-importScripts("components/Color.html");
+importScripts("ExtendedAPI.html");
+importScripts("WorkerController.html");
+importScripts("XHR.html");
+importScripts("FileSystem.html");
+importScripts("Color.html");
 
 (function () {
 	var config = {};
