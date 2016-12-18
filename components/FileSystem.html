@@ -8,6 +8,9 @@
 			if (requestFileSystem === undefined)
 				return false;
 
+			this.PERSISTENT = Symbol("persistent");
+			this.TEMPORARY = Symbol("temporary");
+
 			var self = this;
 			var bytes = typeof (_bytes) === undefined ? 0 : _bytes;
 			self.debug = typeof (_debug) === undefined ? false : _debug;
@@ -456,11 +459,6 @@
 				typeof (webkitResolveLocalFileSystemURL) !== "undefined" ? webkitResolveLocalFileSystemURL : undefined;
 		}
 		
-	if (typeof (this.FileSystem.PERSISTENT) === "undefined")
-		this.FileSystem.PERSISTENT = 1;
-	if (typeof (this.FileSystem.TEMPORARY) === "undefined")
-		this.FileSystem.TEMPORARY = 1;
-
 		return (FileSystem);		
 	}).call(this);
 	
