@@ -135,11 +135,11 @@ importScripts("Color.html");
 //	console.log("error", e);
 //	this.postMessage("error");
 //});
-	this.addEventListener("online", this.online = function (e) {
+	this.addEventListener("online", this.onOnline = function (e) {
 		console.log("online", e);
 //		this.postMessage("online");
 	});
-	this.addEventListener("offline", this.onoffline = function (e) {
+	this.addEventListener("offline", this.onOffline = function (e) {
 		console.log("offline", e);
 //		this.postMessage("offline");
 	});
