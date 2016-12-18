@@ -1450,7 +1450,7 @@
 		 * WORKER
 		 */
 		self.worker = false;
-		self.worker = new WorkerController("MapViewerWorker.js", false);
+		self.worker = new WorkerController("components/MapViewerWorker.js", false);
 		if (self.worker) {
 			self.worker
 				.registerCommand(function (data, message) {
