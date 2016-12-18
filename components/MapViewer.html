@@ -188,6 +188,9 @@
 		if (typeof (conf.regNameMap) === "string")
 			conf.regNameMap = new RegExp(conf.regNameMap);
 		self.config = conf;
+		if (!self.config.imgPath.startsWith("/")) {
+			self.config.imgPath = location.pathname + (location.pathname.endsWith("/") ? "" : "/" ) + self.config.imgPath;
+		}
 		var appName = conf.appName;
 		// prepare objects
 		var storage = localStorage;
