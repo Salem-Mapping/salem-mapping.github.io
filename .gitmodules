@@ -1,0 +1,3 @@
+[submodule "web/lib/github.js"]
+	path = web/lib/github.js
+	url = https://github.com/github-tools/github.git

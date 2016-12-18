@@ -1,4 +1,2 @@
 nbproject
-lib
-*/lib
-!lib/php-curl-class
+/.remote-sync.json
