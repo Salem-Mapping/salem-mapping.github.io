@@ -834,7 +834,8 @@
 			});
 		};
 
-		self.validateMap = function () {
+		self.validateMap = function (_force) {
+			var force = (_force !== undefined) ? _force : false;
 			return new Promise(function (_resolve, _reject) {
 				self.isMapBroken = false;
 				self.loadData()
@@ -846,13 +847,16 @@
 						var preload = [];
 						var each = function (_map, n) {
 //							console.log("refresh", self.maps[n].hash !== _map.hash, self.maps[n].hash, _map.hash);
-							if (self.maps[n] === undefined || self.maps[n].hash !== _map.hash) {
+							let changed = (self.maps[n] === undefined || self.maps[n].hash !== _map.hash);
+							if (force || changed) {
 								if (self.maps[n] === undefined)
 									self.maps[n] = {x: 0, y: 0, scale: 0};
 								self.maps[n].tiles = _map.tiles;
 								self.maps[n].hash = _map.hash;
 								storage.setItem(appName + "_maps_" + n, JSON.stringify(self.maps[n]));
-								changed.push(n);
+								if (changed) {
+									changed.push(n);
+								}
 							}
 
 							if (self.worker) {
@@ -1489,7 +1493,7 @@
 
 		fs.queryUsageAndQuota().catch(alertError);
 		window.reqAnimationFrame(function () {
-			return self.validateMap();
+			return self.validateMap(true);
 		}, alertError)
 			.then(function () {
 				if (Object.keys(self.maps).length > 0) {
