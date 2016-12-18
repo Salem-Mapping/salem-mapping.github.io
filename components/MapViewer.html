@@ -1131,7 +1131,7 @@
 					break;
 				case "String":
 					url = self.config.imgPath + "/" + _file;
-					fileName = _file.replace(/^(.*\/)?(([^\/\.]+)\.([^\.]+))$/, "$2");
+					fileName = _file.replace(new RegExp("/^(.*\/)?(([^\/\.]+)\.([^\.]+))$/"), "$2");
 					break;
 				default:
 					console.log("cant loadTile", _file.constructor.name, _file);
