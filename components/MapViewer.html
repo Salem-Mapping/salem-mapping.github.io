@@ -196,7 +196,7 @@
 		var storage = localStorage;
 		var fs = false;
 		if (typeof (FileSystem) !== "undefined") {
-			fs = new FileSystem(PERSISTENT, undefined, true);
+			fs = new FileSystem(FileSystem.TEMPORARY, undefined, true);
 		}
 		// zero values
 		var win = self.getBoundingClientRect();

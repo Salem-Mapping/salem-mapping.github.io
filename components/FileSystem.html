@@ -2,11 +2,6 @@
 //<script type="text/javascript">
 	'use strict';
 
-	if (typeof (PERSISTENT) === "undefined")
-		this.PERSISTENT = 1;
-	if (typeof (TEMPORARY) === "undefined")
-		this.TEMPORARY = 1;
-
 	this.FileSystem = (function () {
 
 		function FileSystem(_type, _bytes, _debug) {
@@ -460,6 +455,13 @@
 				typeof (resolveLocalFileSystemURL) !== "undefined" ? resolveLocalFileSystemURL :
 				typeof (webkitResolveLocalFileSystemURL) !== "undefined" ? webkitResolveLocalFileSystemURL : undefined;
 		}
-		return (FileSystem);
+		
+	if (typeof (this.FileSystem.PERSISTENT) === "undefined")
+		this.FileSystem.PERSISTENT = 1;
+	if (typeof (this.FileSystem.TEMPORARY) === "undefined")
+		this.FileSystem.TEMPORARY = 1;
+
+		return (FileSystem);		
 	}).call(this);
+	
 //</script>
