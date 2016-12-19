@@ -843,7 +843,7 @@
 						if (_data === null)
 							return _resolve([]);
 						//
-						var changed = [];
+						var changedMaps = [];
 						var preload = [];
 						var each = function (_map, n) {
 //							console.log("refresh", self.maps[n].hash !== _map.hash, self.maps[n].hash, _map.hash);
@@ -855,7 +855,7 @@
 								self.maps[n].hash = _map.hash;
 								storage.setItem(appName + "_maps_" + n, JSON.stringify(self.maps[n]));
 								if (changed) {
-									changed.push(n);
+									changedMaps.push(n);
 								}
 							}
 
@@ -891,7 +891,7 @@
 						}
 
 						storage.setItem(appName + "_maps", JSON.stringify(Object.keys(self.maps)));
-						_resolve(changed);
+						_resolve(changedMaps);
 					}, _reject);
 			});
 		};
