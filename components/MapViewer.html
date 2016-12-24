@@ -191,16 +191,18 @@
         if (typeof (conf.regNameMap) === "string")
             conf.regNameMap = new RegExp(conf.regNameMap);
         self.config = conf;
-        if (self.config.githubOwer && self.config.githubRepo) {
-            let host = self.config.githubOwer + '.github.io';
+        console.log("github", !(!self.config.githubOwner || !self.config.githubRepo));
+        if (!(!self.config.githubOwner || !self.config.githubRepo)) {
+            let host = self.config.githubOwner + '.github.io';
             let uri = location.protocol + '//' + host;
             if (host !== self.config.githubRepo) {
                 uri = '/' + self.config.githubRepo;
             }
-            self.config.imgPath = uri + self.config.imgPath;
+            self.config.imgPath = uri + '/' + self.config.imgPath;
         } else if (!self.config.imgPath.startsWith("/")) {
             self.config.imgPath = location.pathname + (location.pathname.endsWith("/") ? "" : "/") + self.config.imgPath;
         }
+        console.log("self.config.imgPath", self.config.imgPath);
         var appName = conf.appName;
         // prepare objects
         var storage = localStorage;
